@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <data>
+
+        <!-- WooCommerce Operations Form-->
+        <record id="woocommerce_operations_form_view" model="ir.ui.view">
+            <field name="name">woocommerce operations form view</field>
+            <field name="model">woocommerce.operations</field>
+            <field name="arch" type="xml">
+                <form>
+                    <sheet>
+                        <group>
+                        <group>
+                            <field name="instance_id"/>
+                            <field name="woocommerce_operation" widget="radio"/>
+                            <field name="import_operations" widget="radio"
+                                   attrs="{'invisible': [('woocommerce_operation', '!=', 'import')]}"/>
+                        </group>
+                        <group>
+                            <!-- Import Order fields -->
+                            <field name="from_date_order"
+                                   attrs="{'required':[('import_operations', '=', 'import_order')], 'invisible': ['|', ('woocommerce_operation', '!=', 'import'), ('import_operations', '!=', 'import_order')]}"/>
+                            <field name="to_date_order"
+                                   attrs="{'required':[('import_operations', '=', 'import_order')], 'invisible': ['|', ('woocommerce_operation', '!=', 'import'), ('import_operations', '!=', 'import_order')]}"/>
+                            <field name="woocommerce_order_id"
+                                   attrs="{'invisible': ['|', ('woocommerce_operation', '!=', 'import'), ('import_operations', '!=', 'import_order')]}"/>
+
+                            <!--                                &lt;!&ndash; Import Product fields &ndash;&gt;-->
+                            <field name="from_date_product"
+                                   attrs="{'required':[('import_operations', '=', 'import_product')], 'invisible': ['|', ('woocommerce_operation', '!=', 'import'), ('import_operations', '!=', 'import_product')]}"/>
+                            <field name="to_date_product"
+                                   attrs="{'required':[('import_operations', '=', 'import_product')], 'invisible': ['|', ('woocommerce_operation', '!=', 'import'), ('import_operations', '!=', 'import_product')]}"/>
+                            <field name="woocommerce_product_ids"
+                                   attrs="{'invisible': ['|', ('woocommerce_operation', '!=', 'import'), ('import_operations', '!=', 'import_product')]}"/>
+
+                            <!--                                &lt;!&ndash; Import Stock fields &ndash;&gt;-->
+                            <!--                                <field name="auto_validate_inventory_in_odoo"-->
+                            <!--                                       attrs="{'invisible': ['|', ('woocommerce_operation', '!=', 'import'), ('import_operations', '!=', 'import_stock')]}"/>-->
+                        </group>
+                        </group>
+                        <footer>
+                            <button string="Execute" class="oe_highlight" type="object"
+                                    name="execute_process_of_woocommerce"/>
+                            <!--                            <button string="Cancel" class="oe_highlight" special="cancel"/>-->
+                        </footer>
+                    </sheet>
+                </form>
+            </field>
+        </record>
+
+        <record id="actions_woocommerce_operations" model="ir.actions.act_window">
+            <field name="name">WooCommerce Operations</field>
+            <field name="type">ir.actions.act_window</field>
+            <field name="res_model">woocommerce.operations</field>
+            <field name="view_mode">form</field>
+            <field name="view_id" ref="woocommerce_operations_form_view"/>
+            <field name="target">new</field>
+        </record>
+    </data>
+</odoo>
+
+

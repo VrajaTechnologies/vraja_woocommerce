@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <!--Create a Woocommerce shipping product-->
+        <record id="shipping_product" model="product.product">
+            <field name="name">Woocommerce Shipping Product</field>
+            <field name="detailed_type">service</field>
+            <field name="default_code">woocommerce_shipping_product</field>
+        </record>
+
+        <record id="fee_product" model="product.product">
+            <field name="name">Woocommerce Fee Product</field>
+            <field name="detailed_type">service</field>
+            <field name="default_code">woocommerce_fee_product</field>
+        </record>
+    </data>
+</odoo>

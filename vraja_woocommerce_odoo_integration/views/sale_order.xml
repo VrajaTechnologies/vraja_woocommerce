@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <data>
+        <record id="woocommerce_sale_order_form_view" model="ir.ui.view">
+            <field name="name">woocommerce.sale.order.form.view</field>
+            <field name="model">sale.order</field>
+            <field name="inherit_id" ref="sale.view_order_form"/>
+            <field name="arch" type="xml">
+                <xpath expr="//notebook" position="inside">
+                    <page string="Woocommerce Order Detail">
+                        <group>
+                            <group>
+                                <field name="instance_id" readonly="1"/>
+                                <field name="woocommerce_order_number" readonly="1"/>
+                                <field name="woocommerce_sale_auto_workflow_id" readonly="1"/>
+                                <field name="woocommerce_order_id" readonly="1"/>
+                                <field name="payment_gateway_id" readonly="1"/>
+                            </group>
+                        </group>
+                    </page>
+                </xpath>
+            </field>
+        </record>
+    </data>
+</odoo>

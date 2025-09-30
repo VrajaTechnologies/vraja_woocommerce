@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<odoo>
+    <data>
+        <!-- Main menu -->
+        <menuitem id="woocommerce_instance_integration"
+                  action="action_woocommerce_instance_integration"
+                  name="Woo Connector"
+                  web_icon="vraja_woocommerce_odoo_integration,static/description/icon.png"/>
+
+        <!-- Configuration Menu & it's Items -->
+        <menuitem id="woocommerce_configuration_menu"
+                  name="Configuration"
+                  parent="vraja_woocommerce_odoo_integration.woocommerce_instance_integration"/>
+        <menuitem id="woocommerce_configuration_sub_menu"
+                  name="Instance"
+                  action="action_woocommerce_instance_integration"
+                  parent="vraja_woocommerce_odoo_integration.woocommerce_configuration_menu"/>
+        <menuitem id="woocommerce_payment_gateway"
+                  name="Payment Gateway"
+                  action="action_woocommerce_payment_gateway"
+                  parent="vraja_woocommerce_odoo_integration.woocommerce_configuration_menu"/>
+        <menuitem id="woocommerce_financial_status_configuration"
+                  name="Financial Status"
+                  action="vraja_woocommerce_odoo_integration.action_woocommerce_financial_status_configuration"
+                  parent="vraja_woocommerce_odoo_integration.woocommerce_configuration_menu"/>
+        <menuitem id="woocommerce_shipping_method"
+                  name="Shipping Method"
+                  action="action_woocommerce_shipping_method"
+                  parent="vraja_woocommerce_odoo_integration.woocommerce_configuration_menu"/>
+        <menuitem id="woocommerce_order_workflow"
+                  name="Sale Auto Workflow"
+                  action="action_woocommerce_order_workflow_automation"
+                  parent="vraja_woocommerce_odoo_integration.woocommerce_configuration_menu"/>
+
+        <!-- Log Menu & it's Items -->
+        <menuitem id="log_menu"
+                  name="Log"
+                  parent="vraja_woocommerce_odoo_integration.woocommerce_instance_integration"
+                  sequence="3"/>
+        <menuitem id="menu_woocommerce_log"
+                  name="Log Book"
+                  parent="vraja_woocommerce_odoo_integration.log_menu"
+                  sequence="0"
+                  action="action_woocommerce_log"/>
+        <menuitem id="menu_woocommerce_log_line"
+                  name="Log Book Line"
+                  parent="vraja_woocommerce_odoo_integration.log_menu"
+                  sequence="1"
+                  action="action_woocommerce_log_line"/>
+
+        <!-- Process Menu & it's Items -->
+        <menuitem id="woocommerce_process_menu"
+                  name="Process"
+                  parent="vraja_woocommerce_odoo_integration.woocommerce_instance_integration"
+                  sequence="2"/>
+
+        <menuitem id="woocommerce_menu_customer_queue" name="Customer Queue"
+                  parent="vraja_woocommerce_odoo_integration.woocommerce_process_menu"
+                  action="action_woocommerce_customer_queue"/>
+
+        <menuitem id="woocommerce_menu_order_queue"
+                  name="Order Queue"
+                  parent="vraja_woocommerce_odoo_integration.woocommerce_process_menu"
+                  sequence="0"
+                  action="action_woocommerce_order_process"/>
+        <menuitem id="woocommerce_menu_product_queue"
+                  name="Product Queue"
+                  parent="vraja_woocommerce_odoo_integration.woocommerce_process_menu"
+                  sequence="1"
+                  action="action_woocommerce_product_process"/>
+
+        <!-- Product Menu & it's Items -->
+        <menuitem id="woocommerce_product_menu"
+                  name="Product"
+                  parent="vraja_woocommerce_odoo_integration.woocommerce_instance_integration"
+                  sequence="3"/>
+        <menuitem id="woocommerce_product_listing_submenu"
+                  name="Product Listing"
+                  parent="vraja_woocommerce_odoo_integration.woocommerce_product_menu"
+                  sequence="4"
+                  action="action_woocommerce_product_listing"/>
+        <menuitem id="woocommerce_product_listing_item_submenu"
+                  name="Product Listing Item"
+                  parent="vraja_woocommerce_odoo_integration.woocommerce_product_menu"
+                  sequence="5"
+                  action="woocommerce_product_listing_item_action"/>
+        <menuitem id="menu_product_category" name="Product Category"
+                  parent="vraja_woocommerce_odoo_integration.woocommerce_product_menu"
+                  sequence="0"
+                  action="action_woocommerce_product_category"/>
+
+        <menuitem id="menu_product_tags" name="Product Tags"
+                  parent="vraja_woocommerce_odoo_integration.woocommerce_product_menu"
+                  sequence="1"
+                  action="action_woocommerce_product_tags"/>
+    </data>
+</odoo>
