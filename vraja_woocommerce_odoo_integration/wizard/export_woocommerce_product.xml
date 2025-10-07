@@ -10,7 +10,8 @@
                     <field name="set_image" widget="boolean_toggle"/>
                 </group>
                 <footer>
-                    <button string="Export Product To Woocommerce" type="object" name="export_woocommerce_product" class="btn-primary"/>
+                    <button string="Export Product To Woocommerce" type="object" name="export_woocommerce_product"
+                            class="btn-primary"/>
                     <button string="Cancel" special="cancel" class="btn-secondary"/>
                 </footer>
             </form>
@@ -23,4 +24,5 @@
         <field name="view_mode">form</field>
         <field name="target">new</field>
     </record>
+
 </odoo>

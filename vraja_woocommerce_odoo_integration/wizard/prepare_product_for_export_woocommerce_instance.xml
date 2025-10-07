@@ -6,10 +6,10 @@
         <field name="arch" type="xml">
             <form string="Export Instance Wizard Form">
                 <group>
-                    <field name="woocommerce_instance"/>
+                    <field name="woocommerce_instance_id"/>
                 </group>
                 <footer>
-                    <button string="Export" type="object" name="export_product_to_woocommerce_instance" class="btn-primary"/>
+                    <button string="Export" type="object" name="prepare_product_for_export_woocommerce_instance" class="btn-primary"/>
                     <button string="Cancel" special="cancel" class="btn-secondary"/>
                 </footer>
             </form>
