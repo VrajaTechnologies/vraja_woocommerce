@@ -9,7 +9,7 @@
     'data': [
         'security/ir.model.access.csv',
         'wizard/woocommerce_operations_view.xml',
-        'wizard/export_product_to_woocommerce_instance.xml',
+        'wizard/prepare_product_for_export_woocommerce_instance.xml',
         'wizard/export_woocommerce_product.xml',
         'wizard/update_woocommerce_product.xml',
         'data/product_data.xml',
