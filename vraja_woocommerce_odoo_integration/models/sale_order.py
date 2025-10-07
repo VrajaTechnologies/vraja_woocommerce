@@ -44,7 +44,8 @@ class SaleOrder(models.Model):
                 if customer_data:
                     customer_id = self.env['res.partner'].create_update_customer_woocommerce_to_odoo(log_id,
                                                                                                      customer_data=False,
-                                                                                                     so_customer_data=customer_data,instance_id=instance_id)
+                                                                                                     so_customer_data=customer_data,
+                                                                                                     instance_id=instance_id)
                     print(customer_id)
                     return customer_id
             except Exception as e:
@@ -141,7 +142,9 @@ class SaleOrder(models.Model):
             woocommerce_order_lines = [woocommerce_order_lines]
         message = ''
         for order_line_data in woocommerce_order_lines:
-            product_id = self.env['product.product'].browse(17)  # need to replace find product related code
+            product_sku = order_line_data.get("sku")
+            product_id = self.env['product.product'].search([("default_code", "=", product_sku)],
+                                                            limit=1)  # need to replace find product related code
             if not product_id:
                 message = "Product {0} - {1} not found for Order {2}".format(
                     order_line_data.get("sku"), order_line_data.get("name"), woocommerce_order_dictionary.get('number'))
@@ -153,8 +156,7 @@ class SaleOrder(models.Model):
             # order_line_vals.update({'shopify_order_line_id': order_line_data.get('id')})
             sale_order_line = self.env['sale.order.line'].create(order_line_vals)
             sale_order_line.with_context(round=False)._compute_amount()
-
-        return True,message,False,'draft'
+        return True, message, False, 'draft'
 
     def convert_woocommerce_order_date(self, order_response):
         if order_response.get("date_created", False):
@@ -184,7 +186,8 @@ class SaleOrder(models.Model):
                 params = {"_fields": "id,name,rate"}
                 try:
                     url = "{0}/wp-json/wc/v3/taxes/{1}".format(instance_id.woocommerce_url, params)
-                    response_status, response_data,next_page_link = instance_id.woocommerce_api_calling_process("GET", url)
+                    response_status, response_data, next_page_link = instance_id.woocommerce_api_calling_process("GET",
+                                                                                                                 url)
                     tax_data = response_data
                 except Exception:
                     _logger.info(response_data)

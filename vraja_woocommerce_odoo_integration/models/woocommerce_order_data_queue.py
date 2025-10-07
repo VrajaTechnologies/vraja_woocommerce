@@ -79,12 +79,16 @@ class WooCommerceOrderDataQueue(models.Model):
             params = {'include': woocommerce_order_ids} if woocommerce_order_ids else {"after": from_date,
                                                                                        "before": to_date,
                                                                                        }
+            params["per_page"] = 100
             url = "{0}/wp-json/wc/v3/orders".format(instance.woocommerce_url)
-            response_status, response_data,next_page_link = instance.woocommerce_api_calling_process("GET", url, params=params)
+            response_status, response_data, next_page_link = instance.woocommerce_api_calling_process("GET", url, params=params)
             if not response_status:
                 _logger.info("Getting Some error while fetch customer from Woocommerce : {0}".format(response_data))
                 return False
             woocommerce_order_list = response_data
+            while next_page_link:
+                response_status, response_data, next_page_link = instance.woocommerce_api_calling_process("GET", next_page_link, params=params)
+                # woocommerce_order_list = woocommerce_order_list.append(response_data)
             _logger.info(woocommerce_order_list)
         except Exception as error:
             _logger.info("Getting Some Error In Fetch The customer :: {0}".format(error))

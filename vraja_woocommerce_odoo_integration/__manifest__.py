@@ -9,6 +9,9 @@
     'data': [
         'security/ir.model.access.csv',
         'wizard/woocommerce_operations_view.xml',
+        'wizard/prepare_product_for_export_woocommerce_instance.xml',
+        'wizard/export_woocommerce_product.xml',
+        'wizard/update_woocommerce_product.xml',
         'data/product_data.xml',
         'data/cron.xml',
         'views/order_data_queue.xml',
@@ -30,6 +33,7 @@
         'views/res_partner_view.xml',
         'views/sale_order.xml',
         'views/delivery_carrier.xml',
+        'views/product_template.xml',
     ],
 
     'images': [],

@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<odoo>
+    <record id="export_woocommerce_instance_wizard" model="ir.ui.view">
+        <field name="name">export.woocommerce.instance.wizard</field>
+        <field name="model">prepare.product.for.export.woocommerce.instance</field>
+        <field name="arch" type="xml">
+            <form string="Export Instance Wizard Form">
+                <group>
+                    <field name="woocommerce_instance"/>
+                </group>
+                <footer>
+                    <button string="Export" type="object" name="export_product_to_woocommerce_instance" class="btn-primary"/>
+                    <button string="Cancel" special="cancel" class="btn-secondary"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_export_woocommerce_instance_wizard" model="ir.actions.act_window">
+        <field name="name">Woocommerce Instance Wizard</field>
+        <field name="res_model">prepare.product.for.export.woocommerce.instance</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+</odoo>

@@ -17,6 +17,26 @@ class WooCommerceProductListing(models.Model):
     _inherit = ['mail.thread', 'mail.activity.mixin']
     _order = 'id desc'
 
+    def export_woocommerce_product(self):
+        return {
+            'name': 'Woocommerce - Export Product',
+            'type': 'ir.actions.act_window',
+            'res_model': 'export.woocommerce.product',
+            'view_mode': 'form',
+            'target': 'new',
+            'context': {'active_ids': self.ids},
+        }
+
+    def update_woocommerce_product(self):
+        return {
+            'name': 'Woocommerce - Update Product',
+            'type': 'ir.actions.act_window',
+            'res_model': 'update.woocommerce.product',
+            'view_mode': 'form',
+            'target': 'new',
+            'context': {'active_ids': self.ids},
+        }
+
     def compute_count_of_woocommerce_product_variants(self):
         """
         This method is used to count total variants in product listing module.

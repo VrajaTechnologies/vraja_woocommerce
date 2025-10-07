@@ -21,16 +21,35 @@
                     <header>
                         <button name="action_test_connection" string="Test Connection" class="oe_highlight"
                                 type="object"/>
-                        <button class="oe_stat_button" type="action"
-                                name="%(vraja_woocommerce_odoo_integration.action_woocommerce_customer_id)d"
-                                string="Customers"
-                                icon="fa-users"/>
                     </header>
                     <sheet>
+                        <div class="oe_button_box" name="button_box">
+                            <button class="oe_stat_button" type="action"
+                                    name="%(vraja_woocommerce_odoo_integration.action_woocommerce_customer_id)d"
+                                    string="Cron"
+                                    icon="fa-clock-o"/>
+                            <button class="oe_stat_button" type="action"
+                                    name="%(vraja_woocommerce_odoo_integration.action_woocommerce_log_instance_id)d"
+                                    string="Logs"
+                                    icon="fa-bitbucket-square"/>
+                            <button class="oe_stat_button" type="action"
+                                    name="%(vraja_woocommerce_odoo_integration.action_instance_woocommerce_product_listing)d"
+                                    string="Products"
+                                    icon="fa-product-hunt"/>
+                            <button class="oe_stat_button" type="action"
+                                    name="%(vraja_woocommerce_odoo_integration.action_woocommerce_customer_id)d"
+                                    string="Customers"
+                                    icon="fa-users"/>
+                            <button class="oe_stat_button" type="action"
+                                    name="%(vraja_woocommerce_odoo_integration.action_woocommerce_order_id)d"
+                                    string="Orders"
+                                    icon="fa-line-chart"/>
+                        </div>
                         <field name="active" invisible="1"/>
                         <widget name="web_ribbon" text="Archived" bg_color="bg-danger"
                                 attrs="{'invisible': [('active', '=', True)]}"/>
                         <div name="button_box" position="inside">
+
                         </div>
                         <field name="image" widget="image" class="oe_avatar"/>
                         <div class="oe_title">
