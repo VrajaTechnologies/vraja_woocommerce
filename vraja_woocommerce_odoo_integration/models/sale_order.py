@@ -184,7 +184,7 @@ class SaleOrder(models.Model):
                 params = {"_fields": "id,name,rate"}
                 try:
                     url = "{0}/wp-json/wc/v3/taxes/{1}".format(instance_id.woocommerce_url, params)
-                    response_status, response_data = instance_id.woocommerce_api_calling_process("GET", url)
+                    response_status, response_data,next_page_link = instance_id.woocommerce_api_calling_process("GET", url)
                     tax_data = response_data
                 except Exception:
                     _logger.info(response_data)

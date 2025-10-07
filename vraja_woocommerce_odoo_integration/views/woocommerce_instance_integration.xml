@@ -1,6 +1,17 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <odoo>
     <data>
+        <record id="action_woocommerce_customer_id" model="ir.actions.act_window">
+            <field name="name">Woocommerce Customer</field>
+            <field name="res_model">res.partner</field>
+            <field name="view_id" ref="base.view_partner_tree"/>
+            <field name="domain">[('woocommerce_instance_id', '=', active_id)]</field>
+            <field name="help" type="html">
+                <p class="o_view_nocontent_smiling_face">
+                    Woocommerce Customer will display here
+                </p>
+            </field>
+        </record>
         <!--form view-->
         <record id="woocommerce_instance_integration_form" model="ir.ui.view">
             <field name="name">woocommerce instance integration form</field>
@@ -198,17 +209,7 @@
                 </p>
             </field>
         </record>
-        <record id="action_woocommerce_customer_id" model="ir.actions.act_window">
-            <field name="name">Woocommerce Customer</field>
-            <field name="res_model">res.partner</field>
-            <field name="view_id" ref="base.view_partner_tree"/>
-            <field name="domain">[('woocommerce_instance_id', '=', active_id)]</field>
-            <field name="help" type="html">
-                <p class="o_view_nocontent_smiling_face">
-                    Woocommerce Customer will display here
-                </p>
-            </field>
-        </record>
+
 
         <!--kanban view-->
         <record id="woocommerce_instance_integration_kanban" model="ir.ui.view">

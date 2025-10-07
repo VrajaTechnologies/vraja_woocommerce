@@ -80,7 +80,7 @@ class WooCommerceOrderDataQueue(models.Model):
                                                                                        "before": to_date,
                                                                                        }
             url = "{0}/wp-json/wc/v3/orders".format(instance.woocommerce_url)
-            response_status, response_data = instance.woocommerce_api_calling_process("GET", url, params=params)
+            response_status, response_data,next_page_link = instance.woocommerce_api_calling_process("GET", url, params=params)
             if not response_status:
                 _logger.info("Getting Some error while fetch customer from Woocommerce : {0}".format(response_data))
                 return False

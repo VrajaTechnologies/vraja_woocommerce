@@ -16,3 +16,5 @@ from . import woocommerce_product_listing
 from . import woocommerce_product_listing_item
 from . import product_pricelist
 from . import woocommerce_product_image
+from . import woocommerce_inventory_data_queue
+from . import ir_cron

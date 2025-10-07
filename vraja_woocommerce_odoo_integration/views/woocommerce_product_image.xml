@@ -16,7 +16,7 @@
                                 <field name="woocommerce_listing_id" invisible="1"/>
                             </div>
                             <group>
-                                <field name="sequence"/>
+<!--                                <field name="sequence"/>-->
                                 <field name="woocommerce_instance_id" invisible="1"/>
                             </group>
                         </div>

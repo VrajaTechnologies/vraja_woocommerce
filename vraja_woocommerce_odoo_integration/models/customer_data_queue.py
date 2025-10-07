@@ -67,7 +67,7 @@ class CustomerDataQueue(models.Model):
         woocommerce_customer_list = []
         try:
             url = "{0}/wp-json/wc/v3/customers/{1}".format(instance.woocommerce_url,customer_id)
-            response_status, response_data = instance.woocommerce_api_calling_process("GET", url)
+            response_status, response_data,next_page_link = instance.woocommerce_api_calling_process("GET", url)
             if not response_status:
                 _logger.info("Getting Some error while fetch customer from woocommerce : {0}".format(response_data))
                 return False
