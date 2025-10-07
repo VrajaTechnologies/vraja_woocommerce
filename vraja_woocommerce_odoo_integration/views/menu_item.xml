@@ -84,6 +84,12 @@
                   parent="vraja_woocommerce_odoo_integration.woocommerce_product_menu"
                   sequence="5"
                   action="woocommerce_product_listing_item_action"/>
+        <menuitem id="menu_woocommerce_inventory_queue"
+                  name="Export Inventory Queue"
+                  parent="vraja_woocommerce_odoo_integration.woocommerce_product_menu"
+                  sequence="6"
+                  action="action_woocommerce_inventory_process"/>
+
         <menuitem id="menu_product_category" name="Product Category"
                   parent="vraja_woocommerce_odoo_integration.woocommerce_product_menu"
                   sequence="0"

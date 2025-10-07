@@ -5,7 +5,7 @@
     'version': '16.0.0',
     'summary': """""",
     'description': """ """,
-    'depends': ['delivery', 'sale_stock', 'sale_management', 'account'],
+    'depends': ['delivery', 'sale_stock', 'sale_management', 'account','website_sale'],
     'data': [
         'security/ir.model.access.csv',
         'wizard/woocommerce_operations_view.xml',
@@ -13,6 +13,7 @@
         'wizard/export_woocommerce_product.xml',
         'wizard/update_woocommerce_product.xml',
         'data/product_data.xml',
+        'data/cron.xml',
         'views/order_data_queue.xml',
         'views/woocommerce_log.xml',
         'views/woocommerce_instance_integration.xml',
@@ -27,6 +28,7 @@
         'views/woocomerce_financial_status_configuration.xml',  # ⬅ moved BEFORE menu
         'views/woocommerce_order_workflow_automation.xml',
         'views/product_data_queue.xml',
+        'views/woocommerce_inventory_data_queue.xml',
         'views/menu_item.xml',  # ⬅ menus should always come after actions
         'views/res_partner_view.xml',
         'views/sale_order.xml',

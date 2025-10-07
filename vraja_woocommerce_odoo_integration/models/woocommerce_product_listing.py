@@ -739,7 +739,7 @@ class WooCommerceProductListing(models.Model):
     #         try:
     #             api_url = "{0}/wp-json/wc/v3/products/{1}".format(instance.woocommerce_url,
     #                                                               order_line_product_listing_id)
-    #             response_status, response_data, next_page_link = instance.woocommerce_api_calling_process("GET", api_url)
+    #             response_status, response_data = instance.woocommerce_api_calling_process("GET", api_url)
     #             if response_status:
     #                 product_data = response_data
     #         except Exception as e:
@@ -843,25 +843,30 @@ class WooCommerceProductListing(models.Model):
             )
         return response_status, response_data
 
-    def sync_product_image_from_woocommerce(self, instance, product_listing,product_data):
+    def sync_product_image_from_woocommerce(self, instance, product_listing, product_data):
         """
         Sync WooCommerce product & variant images into Odoo.
         - Store in custom image model
         - Update product template and product.product images
+        - Multiple images: first -> image_1920, rest -> product_template_image_ids / product_variant_image_ids
         """
         woocommerce_image_model = self.env['woocommerce.product.image']
         listing_item_model = self.env['woocommerce.product.listing.item']
 
         # ============ STEP 1: SYNC MAIN PRODUCT IMAGES ============
+        template_first_done = False
         for image in product_data.get('images', []):
             image_url = image.get('src')
             if not image_url:
                 continue
 
             wc_image_id = image.get('id')
-            image_datas = base64.b64encode(
-                requests.get(image_url, verify=False, timeout=30).content
-            )
+            try:
+                image_datas = base64.b64encode(
+                    requests.get(image_url, verify=False, timeout=30).content
+                )
+            except Exception:
+                continue
 
             listing_image_id = woocommerce_image_model.search(
                 [('woocommerce_image_id', '=', wc_image_id)], limit=1
@@ -869,10 +874,9 @@ class WooCommerceProductListing(models.Model):
             vals = {
                 'name': product_listing.name,
                 'woocommerce_image_id': wc_image_id,
-                'sequence': image.get('position'),
                 'image': image_datas,
                 'woocommerce_listing_id': product_listing.id,
-                'listing_item_ids': [(6, 0, [])],  # no variants for template image
+                'listing_item_ids': [(6, 0, [])],  # template image, no variants
             }
 
             if listing_image_id:
@@ -880,9 +884,15 @@ class WooCommerceProductListing(models.Model):
             else:
                 woocommerce_image_model.create(vals)
 
-            # Set first image as product template image
-            if image.get('position') == 1:
-                product_listing.product_tmpl_id.write({'image_1920': image_datas})
+            # Update Odoo product.template
+            if not template_first_done:
+                product_listing.product_tmpl_id.image_1920 = image_datas
+                template_first_done = True
+            else:
+                product_listing.product_tmpl_id.product_template_image_ids = [(0, 0, {
+                    'name': image.get('name') or product_listing.name,
+                    'image_1920': image_datas,
+                })]
 
         # ============ STEP 2: FETCH VARIANTS ============
         variant_response_data = self.fetch_woocommerce_variants(
@@ -892,7 +902,21 @@ class WooCommerceProductListing(models.Model):
         # ============ STEP 3: SYNC VARIANT IMAGES ============
         for variant in variant_response_data:
             variant_id = variant.get('id')
-            variant_images = variant.get('image') and [variant['image']] or variant.get('images', [])
+
+            # Collect images from all possible sources
+            variant_images = []
+
+            # Main single image (default WooCommerce)
+            if variant.get('image'):
+                variant_images.append(variant['image'])
+
+            # Standard WooCommerce images array
+            if variant.get('images'):
+                variant_images.extend(variant.get('images'))
+
+            # WooCommerce Additional Variation Images plugin
+            if variant.get('woo_variation_gallery_images'):
+                variant_images.extend(variant.get('woo_variation_gallery_images'))
 
             if not variant_images:
                 continue
@@ -900,8 +924,14 @@ class WooCommerceProductListing(models.Model):
             # Find corresponding listing item (mapped to product.product)
             listing_item = listing_item_model.search([
                 ('woocommerce_instance_id', '=', instance.id),
-                ('woocommerce_product_listing_id', '=', variant_id)
+                ('woocommerce_product_variant_id', '=', variant_id)
             ], limit=1)
+
+            if not listing_item or not listing_item.product_id:
+                continue
+
+            product_variant = listing_item.product_id
+            first_done = False
 
             for image in variant_images:
                 image_url = image.get('src')
@@ -909,17 +939,22 @@ class WooCommerceProductListing(models.Model):
                     continue
 
                 wc_image_id = image.get('id')
-                image_datas = base64.b64encode(
-                    requests.get(image_url, verify=False, timeout=30).content
-                )
+                try:
+                    image_datas = base64.b64encode(
+                        requests.get(image_url, verify=False, timeout=30).content
+                    )
+                except Exception:
+                    continue
 
+                # Check if image already exists in our DB
                 listing_image_id = woocommerce_image_model.search(
                     [('woocommerce_image_id', '=', wc_image_id)], limit=1
                 )
+
                 vals = {
                     'name': product_listing.name,
                     'woocommerce_image_id': wc_image_id,
-                    'sequence': image.get('position'),
+                    'sequence': image.get('position') or 0,
                     'image': image_datas,
                     'woocommerce_listing_id': product_listing.id,
                     'listing_item_ids': [(6, 0, listing_item.ids)],
@@ -930,21 +965,32 @@ class WooCommerceProductListing(models.Model):
                 else:
                     woocommerce_image_model.create(vals)
 
-                # Update variant product image
-                if listing_item and listing_item.product_id:
-                    listing_item.product_id.write({'image_1920': image_datas})
+                # Update Odoo product.product
+                if not first_done:
+                    product_variant.image_1920 = image_datas
+                    first_done = True
+                else:
+                    product_variant.product_variant_image_ids = [(0, 0, {
+                        'name': image.get('name') or product_variant.display_name,
+                        'image_1920': image_datas,
+                    })]
 
-        return True
     def woocommerce_create_products(self, product_queue_line, instance, log_id, order_line_product_listing_id=False):
         """
         Main entry point to create/update WooCommerce products in Odoo.
         """
         # Step 1: Get Product Data
         product_data = self.get_woocommerce_product_data(instance, product_queue_line, order_line_product_listing_id)
-        if not product_data:
-            return True
+        if not product_data or not product_data.get('sku'):
+            product_queue_line.state = 'failed'
+            product_queue_line.number_of_fails += 1
+            error_msg = "Product SKU not found in WooCommerce product data"
+            self.env['woocommerce.log.line'].with_context(
+                for_variant_line=product_queue_line).generate_woocommerce_process_line('product','import',instance,
+                error_msg,False,error_msg,log_id,True)
+            return False
 
-        # Step 2: Find/Create Product Listing and listing item
+            # Step 2: Find/Create Product Listing and listing item
         product_category = self.get_odoo_product_category(
             product_data.get('categories')[0].get('name') if product_data.get('categories') else "Uncategorized"
         )
@@ -970,7 +1016,6 @@ class WooCommerceProductListing(models.Model):
         if product_queue_line and woocommerce_product_listing and not woocommerce_product_listing.product_data_queue_id:
             woocommerce_product_listing.product_data_queue_id = product_queue_line.woocommerce_product_queue_id
         # Step 5: Mark Queue Completed
-
         self.log_and_finalize_queue(product_queue_line, instance, woocommerce_product_listing, product_template,
                                     product_data, log_id)
 
@@ -987,7 +1032,7 @@ class WooCommerceProductListing(models.Model):
         try:
             if product_listing_id:
                 api_url = f"{instance.woocommerce_url}/wp-json/wc/v3/products/{product_listing_id}"
-                response_status, response_data, next_page_link = instance.woocommerce_api_calling_process("GET", api_url)
+                response_status, response_data,next_page_link = instance.woocommerce_api_calling_process("GET", api_url)
                 return response_data if response_status else False
             return eval(product_queue_line.product_data_to_process)
         except Exception as e:
@@ -1023,7 +1068,7 @@ class WooCommerceProductListing(models.Model):
                 woocommerce_tag = woocommerce_tag_obj.search([("name", "=", tags_name)], limit=1)
                 if not woocommerce_tag:
                     sequence += 1
-                    woocommerce_tag = self.env['woocommerce.product.tags'].create({'name': tag, 'code': tags_id, 'instance_id': instance.id,
+                    woocommerce_tag = self.env['woocommerce.product.tags'].create({'name': tags_name, 'code': tags_id, 'instance_id': instance.id,
                                  'company_id': instance.company_id.id, 'slug': slug,"sequence":sequence})
                 sequence = woocommerce_tag.sequence if woocommerce_tag else 0
                 tag_ids.append(woocommerce_tag.id)
@@ -1063,8 +1108,9 @@ class WooCommerceProductListing(models.Model):
                 product_variant_sku = product_variant.get("sku")
                 if product_variant_sku:
                     product_variant = product_product_obj.search([('default_code', '=', product_variant_sku)], limit=1)
-                    product_variant_sku = product_variant.default_code
-                break  # only first valid SKU
+                    if product_variant:
+                        product_variant_sku = product_variant.default_code
+                        break  # only first valid SKU
 
         if not product_variant_sku:
             # fallback: if no SKU in variant response, use main product_data SKU
@@ -1079,6 +1125,7 @@ class WooCommerceProductListing(models.Model):
             template = variant.product_tmpl_id
             template.write({
                 'name': product_data.get('name'),
+                'description':product_data.get('description'),
                 'type': 'product',
                 'categ_id': product_category.id,
             })
@@ -1088,12 +1135,13 @@ class WooCommerceProductListing(models.Model):
         template = False
         if product_variant_sku:
             template = product_template_obj.search([('default_code', '=', product_data.get('sku'))], limit=1)
-        if not template:
-            template = product_template_obj.search([('name', '=', product_data.get('name'))], limit=1)
+        # if not template:
+        #     template = product_template_obj.search([('name', '=', product_data.get('name'))], limit=1)
         if template:
             template.write({
                 'name': product_data.get('name'),
                 'type': 'product',
+                'description': product_data.get('description'),
                 'categ_id': product_category.id,
                 'default_code': product_data.get('sku'),
             })
@@ -1103,6 +1151,7 @@ class WooCommerceProductListing(models.Model):
         vals = {
             'name': product_data.get('name'),
             'type': 'product',
+            'description': product_data.get('description'),
             'categ_id': product_category.id,
             'default_code': product_data.get('sku'),
         }

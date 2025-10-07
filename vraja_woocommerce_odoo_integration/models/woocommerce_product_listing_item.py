@@ -19,6 +19,8 @@ class WoocommerceProductListingItem(models.Model):
     product_sku = fields.Char(string='SKU')
     currency_id = fields.Many2one('res.currency', string='Currency',
                                   default=lambda self: self.env.company.currency_id)
+    stock_type = fields.Selection([("fix", "Fix"), ("percentage", "Percentage")], string="Stock Type")
+
     # image_ids = fields.Many2many('shopify.product.image', 'shopify_product_image_listing_item_rel', 'listing_item_id',
     #                              'shopify_image_id', string="Images")
     # sequence = fields.Integer("Position", default=1)
@@ -38,10 +40,6 @@ class WoocommerceProductListingItem(models.Model):
     #                                              "tracks this product inventory.if select 'Don't track Inventory' then"
     #                                              "after we can not update product stock from odoo")
     #
-    def fetch_woocommerce_product_variant(self,instance,product_data,variant_api_url):
-        params = "per_page=10"
-        response_status, response_data,next_page_link = instance.woocommerce_api_calling_process("GET", variant_api_url,False,params)
-        return response_status,response_data,next_page_link
     # def get_all_inventory_level_from_shopify(self, instance, location_id, log_id):
     #     try:
     #         inventory_level_list_from_shopify, page_info = [], False
@@ -90,83 +88,81 @@ class WoocommerceProductListingItem(models.Model):
     #                 inventory_name=name_of_inventory).action_apply_inventory()
     #     return quant_list
     #
-    # def import_stock_from_shopify_to_odoo(self, instance, auto_validate_inventory_in_odoo):
-    #     """
-    #     This method is used to import product inventory/stock from shopify to Odoo.
-    #     """
-    #     location_message = []
-    #     log_id = self.env['shopify.log'].generate_shopify_logs('inventory', 'import', instance, 'Process Started')
-    #     product_listing_items = self.search(
-    #         [("shopify_instance_id", "=", instance.id), ("exported_in_shopify", "=", True)])
-    #     if product_listing_items:
-    #         instance.test_shopify_connection()
-    #
-    #         location_ids = self.env["shopify.location"].search(
-    #             [("is_import_stock", "=", True), ("instance_id", "=", instance.id)])
-    #         if not location_ids:
-    #             message = "IMPORT STOCK: Please enable at list one Shopify Location for import stock for Locations records in shopify."
-    #             self.env['shopify.log.line'].generate_shopify_process_line('inventory', 'import', instance, message,
-    #                                                                        False, message, log_id, True)
-    #             _logger.info(message)
-    #             self._cr.commit()
-    #             return False
-    #
-    #         for location_id in location_ids:
-    #             warehouse_id = location_id.warehouse_id or False
-    #             if not warehouse_id:
-    #                 message = "IMPORT STOCK Warehouse is not set for Shopify Location {}. Please set from Locations records in shopify.".format(
-    #                     location_id.name)
-    #                 location_message.append(message)
-    #                 _logger.info(message)
-    #                 continue
-    #
-    #             inventory_level_list_from_shopify = self.get_all_inventory_level_from_shopify(instance, location_id,
-    #                                                                                           log_id)
-    #             if not inventory_level_list_from_shopify:
-    #                 continue
-    #
-    #             stock_inventory_array_data = {}
-    #             product_ids_list = []
-    #             for inventory_level in inventory_level_list_from_shopify:
-    #                 inventory_level = inventory_level.to_dict()
-    #                 inventory_item_id = inventory_level.get("inventory_item_id")
-    #                 qty = inventory_level.get("available")
-    #
-    #                 shopify_product = self.env["shopify.product.listing.item"].search(
-    #                     [("inventory_item_id", "=", inventory_item_id), ("exported_in_shopify", "=", True),
-    #                      ("shopify_instance_id", "=", instance.id)], limit=1)
-    #                 if shopify_product:
-    #                     product_id = shopify_product.product_id
-    #                     if product_id not in product_ids_list:
-    #                         stock_inventory_data_line = {product_id.id: qty, }
-    #                         stock_inventory_array_data.update(stock_inventory_data_line)
-    #                         product_ids_list.append(product_id)
-    #
-    #             if len(stock_inventory_array_data) > 0:
-    #                 name_of_inventory = 'Inventory For Instance "%s" And Shopify Location "%s"' % (
-    #                     instance.name, location_id.name)
-    #                 inventory_data = self.create_inventory_adjustment(stock_inventory_array_data,
-    #                                                                   location_id.warehouse_id.lot_stock_id,
-    #                                                                   auto_validate_inventory_in_odoo,
-    #                                                                   name_of_inventory)
-    #                 if inventory_data:
-    #                     message = "IMPORT STOCK: Stock Successfully Updated In %s" % location_id.name
-    #                     self.env['shopify.log.line'].generate_shopify_process_line('inventory', 'import', instance,
-    #                                                                                message,
-    #                                                                                False, message, log_id, False)
-    #                     _logger.info("Created %s." % name_of_inventory)
-    #         if len(location_message) > 0:
-    #             self.env['shopify.log.line'].generate_shopify_process_line('inventory', 'import', instance,
-    #                                                                        location_message, False, location_message,
-    #                                                                        log_id, True)
-    #             log_id.shopify_operation_message = 'Process Has Been Finished'
-    #             _logger.info(location_message)
-    #             self._cr.commit()
-    #             return True
-    #     log_id.shopify_operation_message = 'Process Has Been Finished'
-    #     if not log_id.shopify_operation_line_ids:
-    #         log_id.unlink()
-    #     return True
+    def import_stock_from_shopify_to_odoo(self, instance, auto_validate_inventory_in_odoo):
+        """
+        This method is used to import product inventory/stock from shopify to Odoo.
+        """
+        location_message = []
+        log_id = self.env['woocommerce.log'].generate_shopify_logs('inventory', 'import', instance, 'Process Started')
+        product_listing_items = self.search(
+            [("woocommerce_instance_id", "=", instance.id), ("exported_in_woocommerce", "=", True)])
+        if product_listing_items:
+            location_ids = self.env["shopify.location"].search(
+                [("is_import_stock", "=", True), ("instance_id", "=", instance.id)])
+            if not location_ids:
+                message = "IMPORT STOCK: Please enable at list one Shopify Location for import stock for Locations records in shopify."
+                self.env['shopify.log.line'].generate_shopify_process_line('inventory', 'import', instance, message,
+                                                                           False, message, log_id, True)
+                _logger.info(message)
+                self._cr.commit()
+                return False
+
+            for location_id in location_ids:
+                warehouse_id = location_id.warehouse_id or False
+                if not warehouse_id:
+                    message = "IMPORT STOCK Warehouse is not set for Shopify Location {}. Please set from Locations records in shopify.".format(
+                        location_id.name)
+                    location_message.append(message)
+                    _logger.info(message)
+                    continue
+
+                inventory_level_list_from_shopify = self.get_all_inventory_level_from_shopify(instance, location_id,
+                                                                                              log_id)
+                if not inventory_level_list_from_shopify:
+                    continue
+
+                stock_inventory_array_data = {}
+                product_ids_list = []
+                for inventory_level in inventory_level_list_from_shopify:
+                    inventory_level = inventory_level.to_dict()
+                    inventory_item_id = inventory_level.get("inventory_item_id")
+                    qty = inventory_level.get("available")
+
+                    shopify_product = self.env["shopify.product.listing.item"].search(
+                        [("inventory_item_id", "=", inventory_item_id), ("exported_in_shopify", "=", True),
+                         ("shopify_instance_id", "=", instance.id)], limit=1)
+                    if shopify_product:
+                        product_id = shopify_product.product_id
+                        if product_id not in product_ids_list:
+                            stock_inventory_data_line = {product_id.id: qty, }
+                            stock_inventory_array_data.update(stock_inventory_data_line)
+                            product_ids_list.append(product_id)
+
+                if len(stock_inventory_array_data) > 0:
+                    name_of_inventory = 'Inventory For Instance "%s" And Shopify Location "%s"' % (
+                        instance.name, location_id.name)
+                    inventory_data = self.create_inventory_adjustment(stock_inventory_array_data,
+                                                                      location_id.warehouse_id.lot_stock_id,
+                                                                      auto_validate_inventory_in_odoo,
+                                                                      name_of_inventory)
+                    if inventory_data:
+                        message = "IMPORT STOCK: Stock Successfully Updated In %s" % location_id.name
+                        self.env['shopify.log.line'].generate_shopify_process_line('inventory', 'import', instance,
+                                                                                   message,
+                                                                                   False, message, log_id, False)
+                        _logger.info("Created %s." % name_of_inventory)
+            if len(location_message) > 0:
+                self.env['shopify.log.line'].generate_shopify_process_line('inventory', 'import', instance,
+                                                                           location_message, False, location_message,
+                                                                           log_id, True)
+                log_id.shopify_operation_message = 'Process Has Been Finished'
+                _logger.info(location_message)
+                self._cr.commit()
+                return True
+        log_id.shopify_operation_message = 'Process Has Been Finished'
+        if not log_id.shopify_operation_line_ids:
+            log_id.unlink()
+        return True
     #
     # def prepare_vals_for_variation_attributes(self, result, variation):
     #     """

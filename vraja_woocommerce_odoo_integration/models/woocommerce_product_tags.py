@@ -21,7 +21,7 @@ class ProductCategory(models.Model):
             log_id = self.env['woocommerce.log'].generate_woocommerce_logs('product_tags', 'import', instance,
                                                                            'Process Started')
             url = "{0}/wp-json/wc/v3/products/tags".format(instance.woocommerce_url)
-            response_status, response_data, next_page_link = instance.woocommerce_api_calling_process("GET", url)
+            response_status, response_data,next_page_link = instance.woocommerce_api_calling_process("GET", url)
             if response_status:
                 for product_tags_response in response_data:
                     self.search_or_create_product_tags(instance, product_tags_response, log_id)

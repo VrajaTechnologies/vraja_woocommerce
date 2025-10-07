@@ -105,9 +105,8 @@ class SaleOrder(models.Model):
                   payment_gateway.id)],
                 limit=1)
         else:
-            # payment_gateway = payment_gateway_obj.search_or_create_woocommerce_payment_gateway(instance_id, code=code,
-            #                                                                                    name=name)
-            payment_gateway = self.env['woocommerce.payment.gateway'].browse(1)
+            payment_gateway = payment_gateway_obj.search_or_create_woocommerce_payment_gateway(instance_id, code=code,
+                                                                                               name=name)
             woocommerce_financial_status = woocommerce_financial_status_object.search(
                 [('instance_id', '=', instance_id.id), ('payment_gateway_id.name', '=', payment_gateway.name),
                  ('financial_status', '=', financial_status)], limit=1)
@@ -117,10 +116,10 @@ class SaleOrder(models.Model):
                 woocommerce_order_dictionary.get("number"))
             return False, message, True, 'failed'
 
-        # if not woocommerce_financial_status.sale_auto_workflow_id.policy_of_picking:
-        # message = "We cant find policy of picking in sale auto workflow - {0} for order {1}".format(
-        #     woocommerce_financial_status.sale_auto_workflow_id.name, woocommerce_order_dictionary.get("number"))
-        # return False, message, True, 'failed'
+        if not woocommerce_financial_status.sale_auto_workflow_id.policy_of_picking:
+            message = "We cant find policy of picking in sale auto workflow - {0} for order {1}".format(
+                woocommerce_financial_status.sale_auto_workflow_id, woocommerce_order_dictionary.get("number"))
+            return False, message, True, 'failed'
         return woocommerce_financial_status
 
     def prepare_vals_for_sale_order_line(self, price, quantity, product_id, sale_order_id,
