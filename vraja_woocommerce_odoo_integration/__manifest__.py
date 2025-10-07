@@ -9,10 +9,13 @@
     'data': [
         'security/ir.model.access.csv',
         'wizard/woocommerce_operations_view.xml',
+        'wizard/export_product_to_woocommerce_instance.xml',
+        'wizard/export_woocommerce_product.xml',
+        'wizard/update_woocommerce_product.xml',
         'data/product_data.xml',
         'views/order_data_queue.xml',
-        'views/woocommerce_instance_integration.xml',
         'views/woocommerce_log.xml',
+        'views/woocommerce_instance_integration.xml',
         'views/woocommerce_payment_gateway.xml',
         'views/woocommerce_shipping_method.xml',
         'views/woocommerce_product_listing.xml',
@@ -23,12 +26,12 @@
         'views/woocommerce_product_tags.xml',
         'views/woocomerce_financial_status_configuration.xml',  # ⬅ moved BEFORE menu
         'views/woocommerce_order_workflow_automation.xml',
+        'views/product_data_queue.xml',
         'views/menu_item.xml',  # ⬅ menus should always come after actions
         'views/res_partner_view.xml',
         'views/sale_order.xml',
         'views/delivery_carrier.xml',
-        'views/product_data_queue.xml'
-
+        'views/product_template.xml',
     ],
 
     'images': [],

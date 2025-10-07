@@ -19,7 +19,7 @@ class WooCommerceShippingMethod(models.Model):
             log_id = self.env['woocommerce.log'].generate_woocommerce_logs('shipping', 'import', instance,
                                                                            'Process Started')
             url = "{0}/wp-json/wc/v3/shipping_methods".format(instance.woocommerce_url)
-            response_status, response_data = instance.woocommerce_api_calling_process("GET", url)
+            response_status, response_data, next_page_link = instance.woocommerce_api_calling_process("GET", url)
             if response_status:
                 for shipping_method_response in response_data:
                     self.search_or_create_shipping_method(instance, shipping_method_response, log_id)

@@ -17,6 +17,26 @@ class WooCommerceProductListing(models.Model):
     _inherit = ['mail.thread', 'mail.activity.mixin']
     _order = 'id desc'
 
+    def export_woocommerce_product(self):
+        return {
+            'name': 'Woocommerce - Export Product',
+            'type': 'ir.actions.act_window',
+            'res_model': 'export.woocommerce.product',
+            'view_mode': 'form',
+            'target': 'new',
+            'context': {'active_ids': self.ids},
+        }
+
+    def update_woocommerce_product(self):
+        return {
+            'name': 'Woocommerce - Update Product',
+            'type': 'ir.actions.act_window',
+            'res_model': 'update.woocommerce.product',
+            'view_mode': 'form',
+            'target': 'new',
+            'context': {'active_ids': self.ids},
+        }
+
     def compute_count_of_woocommerce_product_variants(self):
         """
         This method is used to count total variants in product listing module.
@@ -719,7 +739,7 @@ class WooCommerceProductListing(models.Model):
     #         try:
     #             api_url = "{0}/wp-json/wc/v3/products/{1}".format(instance.woocommerce_url,
     #                                                               order_line_product_listing_id)
-    #             response_status, response_data = instance.woocommerce_api_calling_process("GET", api_url)
+    #             response_status, response_data, next_page_link = instance.woocommerce_api_calling_process("GET", api_url)
     #             if response_status:
     #                 product_data = response_data
     #         except Exception as e:
@@ -967,7 +987,7 @@ class WooCommerceProductListing(models.Model):
         try:
             if product_listing_id:
                 api_url = f"{instance.woocommerce_url}/wp-json/wc/v3/products/{product_listing_id}"
-                response_status, response_data = instance.woocommerce_api_calling_process("GET", api_url)
+                response_status, response_data, next_page_link = instance.woocommerce_api_calling_process("GET", api_url)
                 return response_data if response_status else False
             return eval(product_queue_line.product_data_to_process)
         except Exception as e:

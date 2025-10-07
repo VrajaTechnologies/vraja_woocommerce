@@ -16,3 +16,4 @@ from . import woocommerce_product_listing
 from . import woocommerce_product_listing_item
 from . import product_pricelist
 from . import woocommerce_product_image
+from . import product_template
