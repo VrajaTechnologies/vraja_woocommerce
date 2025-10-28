@@ -15,7 +15,7 @@ _logger = logging.getLogger("Shopify_Product_Image")
 class WoocommerceProductImage(models.Model):
     _name = "woocommerce.product.image"
     _description = "Woocommerce Product Image"
-    _order = "sequence, create_date desc, id"
+    _order = "create_date desc, id"
 
     @api.depends('image')
     def compute_image_hexdigest(self):

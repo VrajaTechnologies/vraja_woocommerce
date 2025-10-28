@@ -3,7 +3,7 @@
 <!--    update product wizard-->
      <record id="update_woocommerce_product_wizard" model="ir.ui.view">
         <field name="name">update.woocommerce.product.wizard</field>
-        <field name="model">update.woocommerce.product</field>
+        <field name="model">woocommerce.product.update</field>
         <field name="arch" type="xml">
             <form string="Update Woocommerce Product Wizard Form">
                 <group>
@@ -20,7 +20,7 @@
 
     <record id="action_update_woocommerce_product_wizard" model="ir.actions.act_window">
         <field name="name">Woocommerce Update Product Wizard</field>
-        <field name="res_model">update.woocommerce.product</field>
+        <field name="res_model">woocommerce.product.update</field>
         <field name="view_mode">form</field>
         <field name="target">new</field>
     </record>
