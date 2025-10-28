@@ -106,7 +106,7 @@ class PrepareProductForExportWoocommerceInstance(models.TransientModel):
                                     "product_sku": product_variant.default_code,
                                 }
                                 woocommerce_product_variant.write(product_variant_data)
-                                message = f"Product Variant '{variant_name}' Exported successfully (Product ID: {product.id})."
+                                message = f"Product Variant '{product_variant.id}' Exported successfully (Product ID: {product.id})."
                                 self.env['woocommerce.log.line'].generate_woocommerce_process_line('product', 'export',
                                                                                                    woocommerce_instance,
                                                                                                    message,
@@ -129,7 +129,7 @@ class PrepareProductForExportWoocommerceInstance(models.TransientModel):
                                     'woocommerce_instance_id': woocommerce_instance.id
                                 }
                                 woocommerce_product_variants.create(wc_product_variant)
-                                message = f"Product Variant '{variant_name}' Exported successfully (Product ID: {product_variant.id})."
+                                message = f"Product Variant Exported successfully (Product ID: {product_variant.id})."
                                 self.env['woocommerce.log.line'].generate_woocommerce_process_line('product', 'export',
                                                                                                    woocommerce_instance,
                                                                                                    message,
@@ -182,7 +182,7 @@ class PrepareProductForExportWoocommerceInstance(models.TransientModel):
                             }
                             woocommerce_product_variants.create(wc_product_variant)
 
-                            message = f"Product Variant'{product_variant.id}' Exported successfully (Product ID: {product_variant.id})."
+                            message = f"Product Variant Exported successfully (Product ID: {product_variant.id})."
                             self.env['woocommerce.log.line'].generate_woocommerce_process_line('product', 'export',
                                                                                                woocommerce_instance,
                                                                                                message,
