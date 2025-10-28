@@ -21,11 +21,10 @@ class PrepareProductForExportWoocommerceInstance(models.TransientModel):
         active_template_ids = self.env.context.get("active_ids", [])
         product_template_ids = self.env['product.template'].browse(active_template_ids)
         product_templates = product_template_ids.filtered(lambda template: template.detailed_type == "product")
+        non_storable_products =product_template_ids.filtered(lambda template: template.detailed_type != "product")
         woocommerce_products = self.env['woocommerce.product.listing']
         woocommerce_product_variants = self.env['woocommerce.product.listing.item']
 
-        if not product_templates:
-            raise UserError("It seems like selected products are not storable products.")
         for product in product_templates:
             if not product.default_code:
                 variants = product.product_variant_id
@@ -93,7 +92,6 @@ class PrepareProductForExportWoocommerceInstance(models.TransientModel):
                         if not product_variant.default_code:
                             no_sku_product_variant.append(variant_name)
                             continue
-                        woocommerce_product_variants = self.env['woocommerce.product.listing.item']
                         woocommerce_product_variant = self.env['woocommerce.product.listing.item'].search(
                             [('product_sku', '=', product_variant.default_code)], limit=1)
                         if not woocommerce_product_variant:
@@ -197,7 +195,7 @@ class PrepareProductForExportWoocommerceInstance(models.TransientModel):
                                 False, f"Failed to export variant {product_variant.name} of {product.name}: {e}",
                                 log_id, True
                             )
-            woocommerce_product_ids = self.env['woocommerce.product.listing'].search(
+            woocommerce_product_ids = woocommerce_products.search(
                 [("product_tmpl_id", "=", product.id)])
             for woocommerce_product_id in woocommerce_product_ids:
                 if not woocommerce_product_id.exported_in_woocommerce:
@@ -474,6 +472,10 @@ class PrepareProductForExportWoocommerceInstance(models.TransientModel):
                                 False, f"Exception while updating variant '{product_variant.name}'",
                                 log_id, True
                             )
+        if non_storable_products:
+            self.env.cr.commit()
+            names = ", ".join(non_storable_products.mapped("name"))
+            error_messages.append(f"The following products are not storable and cannot be exported: {names}.")
 
         if no_sku_products:
             self.env.cr.commit()
