@@ -56,6 +56,11 @@ class WooCommerceInstanceIntegrations(models.Model):
     is_sync_wc_images = fields.Boolean("Sync Product Images?",
                                        help="If true then Images will be sync at the time of Import Products.",
                                        default=False)
+    woocommerce_discount_product_id = fields.Many2one('product.product', string="Discount Product", copy=False,
+                                                      default=lambda self: self.env.ref(
+                                                          'vraja_woocommerce_odoo_integration.discount_product', False),
+                                                      help="This product will be considered as a discount product for add \n"
+                                                           "sale order line")
 
     def action_test_connection(self):
         instance = self
@@ -143,8 +148,6 @@ class WooCommerceInstanceIntegrations(models.Model):
         result = self.env.cr.fetchall()
         return [item[0] for item in result]
 
-
-
     def prepare_export_stock_data_for_woocommerce(self, instance):
         """
         Prepare export stock data for WooCommerce for both variants and simple products.
@@ -182,7 +185,6 @@ class WooCommerceInstanceIntegrations(models.Model):
         for item in listing_items:
             product = item.product_id
             actual_stock = getattr(product, 'free_qty', 0)
-
 
             queue_line_data.append({
                 'product_id': product.id,
@@ -259,4 +261,3 @@ class WooCommerceInstanceIntegrations(models.Model):
 
         _logger.info("WooCommerce stock queue created successfully for %d products.", len(queue_line_data))
         return True
-

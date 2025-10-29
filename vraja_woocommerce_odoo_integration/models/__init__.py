@@ -19,3 +19,5 @@ from . import woocommerce_product_image
 from . import woocommerce_inventory_data_queue
 from . import ir_cron
 from . import product_template
+from . import woocommerce_taxes
+from . import account_tax

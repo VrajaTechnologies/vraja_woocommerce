@@ -99,5 +99,9 @@
                   parent="vraja_woocommerce_odoo_integration.woocommerce_product_menu"
                   sequence="1"
                   action="action_woocommerce_product_tags"/>
+        <menuitem id="menu_woocommerce_taxes" name="Woocommerce Taxes"
+                  parent="vraja_woocommerce_odoo_integration.woocommerce_product_menu"
+                  sequence="7"
+                  action="action_woocommerce_taxes"/>
     </data>
 </odoo>

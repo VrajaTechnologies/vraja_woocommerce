@@ -5,6 +5,7 @@ class PrepreProductForExportWoocommerceInstance(models.TransientModel):
     _description = "Export Product Woocommerce Instance Wizard"
 
     woocommerce_instance = fields.Many2one('woocommerce.instance.integration',string="Woocomerce Instance")
+
     def prepare_product_for_export_woocommerce_instance(self):
         """export products from """
         pass

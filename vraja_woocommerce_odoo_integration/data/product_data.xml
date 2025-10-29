@@ -13,5 +13,10 @@
             <field name="detailed_type">service</field>
             <field name="default_code">woocommerce_fee_product</field>
         </record>
+        <record id="discount_product" model="product.product">
+            <field name="name">Woocommerce Discount Product</field>
+            <field name="detailed_type">service</field>
+            <field name="default_code">woocommerce_discount_product</field>
+        </record>
     </data>
 </odoo>

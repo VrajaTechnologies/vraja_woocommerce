@@ -9,7 +9,7 @@
                     <field name="woocommerce_instance"/>
                 </group>
                 <footer>
-                    <button string="Export" type="object" name="export_product_to_woocommerce_instance" class="btn-primary"/>
+                    <button string="Export" type="object" name="prepare_product_for_export_woocommerce_instance" class="btn-primary"/>
                     <button string="Cancel" special="cancel" class="btn-secondary"/>
                 </footer>
             </form>

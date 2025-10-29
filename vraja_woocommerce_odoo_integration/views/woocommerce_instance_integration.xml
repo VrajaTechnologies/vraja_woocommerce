@@ -103,6 +103,20 @@
                                         </div>
                                     </div>
                                 </div>
+                                <div class="o_setting_right_pane">
+                                    <label for="woocommerce_discount_product_id"/>
+                                    <div class="text-muted">
+                                        This product will be recognized as a discount item when adding a line to the
+                                        sales order.
+                                    </div>
+                                    <div class="content-group">
+                                        <div class="oe_inline">
+                                            <field name="woocommerce_discount_product_id"
+                                                   string="Discount Product"
+                                                   domain="[('detailed_type', '=', 'service')]"/>
+                                        </div>
+                                    </div>
+                                </div>
 
                             </page>
                             <page name="Woocommerce_product_information" string="Product">
