@@ -23,3 +23,49 @@ class MarketplaceProductImage(http.Controller):
             except Exception:
                 return request.not_found()
         return request.not_found()
+
+class Main(http.Controller):
+
+    @http.route(['/woocommerce/webhook_for_customer_create'], csrf=False, auth="public", type="json")
+    def customer_create_webhook(self):
+        """
+        Route for handling customer create webhook for Woocommerce. This route calls while new customer create
+        in the Woocommerce store.
+        """
+        webhook_route = request.httprequest.path.split('/')[1]
+        res, instance = self.get_basic_info(webhook_route)
+        if not res:
+            return
+        if res.get("first_name") and res.get("last_name"):
+            _logger.info("%s call for Customer: %s", webhook_route,
+                         (res.get("first_name") + " " + res.get("last_name")))
+            self.customer_webhook_process(instance, res)
+        return
+
+    def customer_webhook_process(self, instance_id, res):
+        """
+        This method used for call child method of customer create process.
+        """
+        _logger.info("Woocommerce Customer response :: {}".format(res))
+        queue_id = request.env['customer.data.queue'].sudo().generate_woocommerce_customer_queue(instance_id)
+        request.env['customer.data.queue.line'].sudo().create_woocommerce_customer_queue_line(res, instance_id,
+                                                                                          queue_id)
+        queue_id.sudo().process_woocommerce_customer_queue()
+
+    def get_basic_info(self, route):
+        """
+        This method is used to check that instance and webhook are active or not. If yes then return response and
+        instance, If no then return response as False and instance.
+        """
+        res = request.get_json_data()
+        _logger.info("Get json data : ", res)
+        host = request.httprequest.headers.get("X-woocommerce-Shop-Domain")
+        instance = request.env["woocommerce.instance.integration"].sudo().with_context(active_test=False).search(
+            [("woocommerce_url", "ilike", host)], limit=1)
+        webhook = request.env["woocommerce.webhook"].sudo().search([("delivery_url", "ilike", route),
+                                                                ("instance_id", "=", instance.id)], limit=1)
+        if not instance.active or not webhook.state == "active":
+            _logger.info("The method is skipped. It appears the instance:%s is not active or that "
+                         "the webhook %s is not active.", instance.name, webhook.webhook_name)
+            res = False
+        return res, instance

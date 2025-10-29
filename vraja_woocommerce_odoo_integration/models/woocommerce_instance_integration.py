@@ -62,6 +62,30 @@ class WooCommerceInstanceIntegrations(models.Model):
                                                       help="This product will be considered as a discount product for add \n"
                                                            "sale order line")
 
+    webhook_ids = fields.One2many("woocommerce.webhook", "instance_id", "Webhooks")
+
+
+    # @api.model
+    # def create(self, vals):
+    #     record = super(WooCommerceInstanceIntegrations, self).create(vals)
+    #     # After instance is created, automatically create webhook
+    #     record.env['woocommerce.webhook'].create({
+    #         'instance_url': record.url,
+    #         'consumer_key': record.consumer_key,
+    #         'consumer_secret': record.consumer_secret,
+    #     }).create_customer_webhook()
+    #     return record
+    #
+    # @api.model
+    # def _auto_create_woocommerce_webhooks(self):
+    #     instances = self.env['woocommerce.instance.integration'].search([])
+    #     for inst in instances:
+    #         self.env['woocommerce.webhook'].create({
+    #             'instance_url': inst.url,
+    #             'consumer_key': inst.consumer_key,
+    #             'consumer_secret': inst.consumer_secret,
+    #         }).create_customer_webhook()
+
     def action_test_connection(self):
         instance = self
         self.env['woocommerce.payment.gateway'].import_woocommerce_payment_gateway(self)
@@ -148,6 +172,8 @@ class WooCommerceInstanceIntegrations(models.Model):
         result = self.env.cr.fetchall()
         return [item[0] for item in result]
 
+
+
     def prepare_export_stock_data_for_woocommerce(self, instance):
         """
         Prepare export stock data for WooCommerce for both variants and simple products.
@@ -185,6 +211,7 @@ class WooCommerceInstanceIntegrations(models.Model):
         for item in listing_items:
             product = item.product_id
             actual_stock = getattr(product, 'free_qty', 0)
+
 
             queue_line_data.append({
                 'product_id': product.id,
@@ -261,3 +288,4 @@ class WooCommerceInstanceIntegrations(models.Model):
 
         _logger.info("WooCommerce stock queue created successfully for %d products.", len(queue_line_data))
         return True
+
