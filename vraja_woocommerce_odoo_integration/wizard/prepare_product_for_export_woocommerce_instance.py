@@ -1,6 +1,6 @@
+import json
 from odoo import fields, models
 from odoo.exceptions import UserError, ValidationError
-import json
 
 class PrepareProductForExportWoocommerceInstance(models.TransientModel):
     _name = "prepare.product.for.export.woocommerce.instance"
@@ -27,7 +27,7 @@ class PrepareProductForExportWoocommerceInstance(models.TransientModel):
 
         for product in product_templates:
             if not product.default_code:
-                variants = product.product_variant_id
+                variants = product.product_variant_ids
                 variants_with_sku = variants.filtered(lambda v: v.default_code)
                 if not variants_with_sku:
                     product_name = product.name
@@ -472,18 +472,15 @@ class PrepareProductForExportWoocommerceInstance(models.TransientModel):
                                 False, f"Exception while updating variant '{product_variant.name}'",
                                 log_id, True
                             )
+        self.env.cr.commit()
         if non_storable_products:
-            self.env.cr.commit()
             names = ", ".join(non_storable_products.mapped("name"))
             error_messages.append(f"The following products are not storable and cannot be exported: {names}.")
-
         if no_sku_products:
-            self.env.cr.commit()
             product_names = ', '.join(no_sku_products)
             error_messages.append(f"The following products cannot be exported without SKU: {product_names}")
 
         if no_sku_product_variant:
-            self.env.cr.commit()
             variant_names = ', '.join(no_sku_product_variant)
             error_messages.append(
                 f"The following product variant cannot be exported without SKU: [{variant_names}]")
