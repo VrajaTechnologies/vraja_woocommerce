@@ -17,7 +17,7 @@ class PrepareProductForExportWoocommerceInstance(models.TransientModel):
         no_sku_product_variant = []
         woocommerce_instance = self.woocommerce_instance_id
         log_id = self.env['woocommerce.log'].generate_woocommerce_logs("product", "export", woocommerce_instance,
-                                                                       "Export Process Started")
+                                                                       "Product Export Process Started")
         active_template_ids = self.env.context.get("active_ids", [])
         product_template_ids = self.env['product.template'].browse(active_template_ids)
         product_templates = product_template_ids.filtered(lambda template: template.detailed_type == "product")
@@ -27,15 +27,25 @@ class PrepareProductForExportWoocommerceInstance(models.TransientModel):
 
         for product in product_templates:
             if not product.default_code:
-                variants = product.product_variant_id
+                variants = product.product_variant_ids
                 variants_with_sku = variants.filtered(lambda v: v.default_code)
                 if not variants_with_sku:
                     product_name = product.name
                     no_sku_products.append(product_name)
+                    message = f"Product '{product.name}' variants have no SKU so product can not exported. (Product ID: {product.id})."
+                    self.env['woocommerce.log.line'].generate_woocommerce_process_line('product', 'export',
+                                                                                       woocommerce_instance,
+                                                                                       message, False, message,
+                                                                                       log_id, False)
                     continue
             if not product.default_code and not product.attribute_line_ids:
                 product_name = product.name
                 no_sku_products.append(product_name)
+                message = f"Product '{product.name}' can not be exported without SKU (Product ID: {product.id})."
+                self.env['woocommerce.log.line'].generate_woocommerce_process_line('product', 'export',
+                                                                                   woocommerce_instance,
+                                                                                   message, False, message,
+                                                                                   log_id, False)
                 continue
             woocommerce_product = self.env['woocommerce.product.listing'].search([
                 ('product_tmpl_id', '=', product.id),
@@ -51,16 +61,16 @@ class PrepareProductForExportWoocommerceInstance(models.TransientModel):
                         "description": product.description or "",
                     }
                     woocommerce_product.write(product_data)
-                    message = f"Product '{product.name}' Exported successfully (Product ID: {product.id})."
-                    self.env['woocommerce.log.line'].generate_woocommerce_process_line('product', 'export',
+                    message = f"Product '{product.name}' Updated successfully (Product ID: {product.id})."
+                    self.env['woocommerce.log.line'].generate_woocommerce_process_line('product', 'update',
                                                                                        woocommerce_instance,
                                                                                        message, False, message,
                                                                                        log_id, False)
                 except Exception as e:
                     self.env['woocommerce.log.line'].generate_woocommerce_process_line(
-                        'product', 'export', woocommerce_instance,
-                        f"Failed to export product {product.name}: {e}",
-                        False, f"Failed to export product {product.name}", log_id, True
+                        'product', 'update', woocommerce_instance,
+                        f"Failed to update product {product.name}: {e}",
+                        False, f"Failed to update product {product.name}", log_id, True
                     )
 
                 product_variants = product.product_variant_ids
@@ -91,6 +101,11 @@ class PrepareProductForExportWoocommerceInstance(models.TransientModel):
                         variant_name = ', '.join(product_variant.product_template_variant_value_ids.mapped('name'))
                         if not product_variant.default_code:
                             no_sku_product_variant.append(variant_name)
+                            message = f"Product '{product_variant.product_name}' can not be exported without SKU (Product variant ID: {product_variant.id})."
+                            self.env['woocommerce.log.line'].generate_woocommerce_process_line('product', 'export',
+                                                                                               woocommerce_instance,
+                                                                                               message, False, message,
+                                                                                               log_id, False)
                             continue
                         woocommerce_product_variant = self.env['woocommerce.product.listing.item'].search(
                             [('product_sku', '=', product_variant.default_code)], limit=1)
@@ -106,17 +121,17 @@ class PrepareProductForExportWoocommerceInstance(models.TransientModel):
                                     "product_sku": product_variant.default_code,
                                 }
                                 woocommerce_product_variant.write(product_variant_data)
-                                message = f"Product Variant '{product_variant.id}' Exported successfully (Product ID: {product.id})."
-                                self.env['woocommerce.log.line'].generate_woocommerce_process_line('product', 'export',
+                                message = f"Product Variant '{product_variant.id}' Updated successfully (product variant ID: {woocommerce_product_variant.id})."
+                                self.env['woocommerce.log.line'].generate_woocommerce_process_line('product', 'update',
                                                                                                    woocommerce_instance,
                                                                                                    message,
                                                                                                    False, message,
                                                                                                    log_id, False)
                             except Exception as e:
                                 self.env['woocommerce.log.line'].generate_woocommerce_process_line(
-                                    'product', 'export', woocommerce_instance,
-                                    f"Failed to export product {product.name}: {e}",
-                                    False, f"Failed to export product {product.name}", log_id, True
+                                    'product', 'update', woocommerce_instance,
+                                    f"Failed to update product {product.name}: {e}",
+                                    False, f"Failed to update product {product.name}", log_id, True
                                 )
                         else:
                             try:
@@ -128,8 +143,8 @@ class PrepareProductForExportWoocommerceInstance(models.TransientModel):
                                     'woocommerce_product_listing_id': woocommerce_product.id,
                                     'woocommerce_instance_id': woocommerce_instance.id
                                 }
-                                woocommerce_product_variants.create(wc_product_variant)
-                                message = f"Product Variant Exported successfully (Product ID: {product_variant.id})."
+                                new_variant = woocommerce_product_variants.create(wc_product_variant)
+                                message = f"Product Variant {new_variant.name} Exported successfully (Product ID: {new_variant.id})."
                                 self.env['woocommerce.log.line'].generate_woocommerce_process_line('product', 'export',
                                                                                                    woocommerce_instance,
                                                                                                    message,
@@ -171,6 +186,11 @@ class PrepareProductForExportWoocommerceInstance(models.TransientModel):
                         if not product_variant.default_code:
                             variant_name = ', '.join(product_variant.product_template_variant_value_ids.mapped('name'))
                             no_sku_product_variant.append(variant_name)
+                            message = f"Product variant '{product_variant.product_name}' can not be exported without SKU (Product variant ID: {product_variant.id})."
+                            self.env['woocommerce.log.line'].generate_woocommerce_process_line('product', 'export',
+                                                                                               woocommerce_instance,
+                                                                                               message, False, message,
+                                                                                               log_id, False)
                             continue
                         try:
                             wc_product_variant = {
@@ -182,7 +202,7 @@ class PrepareProductForExportWoocommerceInstance(models.TransientModel):
                             }
                             woocommerce_product_variants.create(wc_product_variant)
 
-                            message = f"Product Variant Exported successfully (Product ID: {product_variant.id})."
+                            message = f"Product Variant {product_variant.id.name} Exported successfully (Product ID: {product_variant.id})."
                             self.env['woocommerce.log.line'].generate_woocommerce_process_line('product', 'export',
                                                                                                woocommerce_instance,
                                                                                                message,
@@ -248,7 +268,7 @@ class PrepareProductForExportWoocommerceInstance(models.TransientModel):
                             woocommerce_product_id.write({
                                 'woocommerce_product_id': product_id,
                             })
-                            message = f"Product '{woocommerce_product_id.name}' exported successfully (WooCommerce ID: {result.get('id')})in Woocommerce."
+                            message = f"Product '{woocommerce_product_id.name}' exported successfully in Woocommerce.(WooCommerce ID: {result.get('id')})"
                             self.env['woocommerce.log.line'].generate_woocommerce_process_line('product', 'export',
                                                                                                woocommerce_instance,
                                                                                                message, False, message,
@@ -315,7 +335,7 @@ class PrepareProductForExportWoocommerceInstance(models.TransientModel):
                                     product_var_id.write({
                                         'woocommerce_product_variant_id': result.get('id')
                                     })
-                                    message = f"Product: '{product_var_id.name}' exported successfully (WooCommerce ID: {result.get('id')}) in Woocommerce."
+                                    message = f"Product variant '{product_var_id.name}' exported successfully  in Woocommerce.(WooCommerce ID: {result.get('id')})"
                                     self.env['woocommerce.log.line'].generate_woocommerce_process_line('product',
                                                                                                        'export',
                                                                                                        woocommerce_instance,
@@ -472,18 +492,17 @@ class PrepareProductForExportWoocommerceInstance(models.TransientModel):
                                 False, f"Exception while updating variant '{product_variant.name}'",
                                 log_id, True
                             )
+        self.env.cr.commit()
+
         if non_storable_products:
-            self.env.cr.commit()
             names = ", ".join(non_storable_products.mapped("name"))
             error_messages.append(f"The following products are not storable and cannot be exported: {names}.")
 
         if no_sku_products:
-            self.env.cr.commit()
             product_names = ', '.join(no_sku_products)
             error_messages.append(f"The following products cannot be exported without SKU: {product_names}")
 
         if no_sku_product_variant:
-            self.env.cr.commit()
             variant_names = ', '.join(no_sku_product_variant)
             error_messages.append(
                 f"The following product variant cannot be exported without SKU: [{variant_names}]")

@@ -182,7 +182,17 @@
                                         </div>
                                     </div>
                                 </div>
-
+                            </page>
+                            <!--                            woocommerce webhook-->
+                            <page name="woocommerce_webhook" string="Woocommerce Webhooks">
+                                <field name="webhook_ids" nolabel="1" mode="tree">
+                                    <tree editable="bottom"
+                                          decoration-success="state=='active'">
+                                        <field name="webhook_name" required="1"/>
+                                        <field name="webhook_action" required="1"/>
+                                        <field name="state" required="1"/>
+                                    </tree>
+                                </field>
                             </page>
                         </notebook>
                     </sheet>

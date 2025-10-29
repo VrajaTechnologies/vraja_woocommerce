@@ -56,6 +56,29 @@ class WooCommerceInstanceIntegrations(models.Model):
     is_sync_wc_images = fields.Boolean("Sync Product Images?",
                                        help="If true then Images will be sync at the time of Import Products.",
                                        default=False)
+    webhook_ids = fields.One2many("woocommerce.webhook", "instance_id", "Webhooks")
+
+
+    # @api.model
+    # def create(self, vals):
+    #     record = super(WooCommerceInstanceIntegrations, self).create(vals)
+    #     # After instance is created, automatically create webhook
+    #     record.env['woocommerce.webhook'].create({
+    #         'instance_url': record.url,
+    #         'consumer_key': record.consumer_key,
+    #         'consumer_secret': record.consumer_secret,
+    #     }).create_customer_webhook()
+    #     return record
+    #
+    # @api.model
+    # def _auto_create_woocommerce_webhooks(self):
+    #     instances = self.env['woocommerce.instance.integration'].search([])
+    #     for inst in instances:
+    #         self.env['woocommerce.webhook'].create({
+    #             'instance_url': inst.url,
+    #             'consumer_key': inst.consumer_key,
+    #             'consumer_secret': inst.consumer_secret,
+    #         }).create_customer_webhook()
 
     def action_test_connection(self):
         instance = self
