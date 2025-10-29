@@ -1,12 +1,10 @@
-import base64
 import pytz
 import logging
 import requests
 from dateutil import parser
-from datetime import datetime
 from odoo import models, fields, api, _
 from odoo.exceptions import AccessError, ValidationError
-
+import base64
 _logger = logging.getLogger("Import Order Process:")
 utc = pytz.utc
 
@@ -21,7 +19,7 @@ class WooCommerceProductListing(models.Model):
         return {
             'name': 'Woocommerce - Export Product',
             'type': 'ir.actions.act_window',
-            'res_model': 'export.woocommerce.product',
+            'res_model': 'woocommerce.product.export',
             'view_mode': 'form',
             'target': 'new',
             'context': {'active_ids': self.ids},
@@ -31,7 +29,7 @@ class WooCommerceProductListing(models.Model):
         return {
             'name': 'Woocommerce - Update Product',
             'type': 'ir.actions.act_window',
-            'res_model': 'update.woocommerce.product',
+            'res_model': 'woocommerce.product.update',
             'view_mode': 'form',
             'target': 'new',
             'context': {'active_ids': self.ids},
@@ -69,6 +67,7 @@ class WooCommerceProductListing(models.Model):
 
     # published_at = fields.Datetime("Published Date")
     image_ids = fields.One2many('woocommerce.product.image', 'woocommerce_listing_id', 'Images')
+
     #
     # def sync_product_image_from_shopify(self, shopify_instance_id, shopify_listing_id, shopify_product_dict):
     #     shopify_image_response_vals = shopify_product_dict.get('images', {})
@@ -107,60 +106,71 @@ class WooCommerceProductListing(models.Model):
     #                 shopify_listing_id.product_tmpl_id.write({'image_1920': image_datas})
     #     return True
     #
-    # def update_shopify_product_images(self, log_id, instance, product_type):
-    #     """
-    #     Export OR Update Images From Odoo To Shopify.
-    #     While Export OR Update Product First Fetch all the Product From Shopify If There is no Images Inside odoo, so we Destroy the Images in Shopify For that Listing.
-    #     Inside Listing Images available and Shopify Image ID not Set that we Export it to Shopify.
-    #     If Shopify Image ID Set then we Update the Data From odoo to Shopify.
-    #     After all process complete Check In Shopify Is there any Extra Images available If yes then we Destroy in Shopify (Compare with odoo listing image)
-    #     """
-    #     self.ensure_one()
-    #
-    #     # Deleting listing images in Shopify if no images available in Odoo.
-    #     shopify_images = shopify.Image().find(product_id=self.shopify_product_id)
-    #     if not self.image_ids and shopify_images:
-    #         for shop_image in shopify_images:
-    #             shop_image.destroy()
-    #         return False
-    #     for image_id in self.image_ids:
-    #         if not image_id.shopify_image_id and image_id.image:
-    #             shopify_image = shopify.Image()
-    #             shopify_image.product_id = self.shopify_product_id
-    #             shopify_image.position = image_id.sequence
-    #             shopify_image.attachment = image_id.image.decode('UTF-8')
-    #             # shopify_image.alt = image_id.shopify_alt_text or ''
-    #             shopify_image.variant_ids = image_id.listing_item_ids.mapped('shopify_product_variant_id')
-    #             response = shopify_image.save()
-    #             if response:
-    #                 image_id.shopify_image_id = shopify_image.id
-    #                 message = 'Shopify Image ID : {}'.format(shopify_image.id)
-    #                 self.env['shopify.log.line'].generate_shopify_process_line('product', product_type, instance,
-    #                                                                            message,
-    #                                                                            False, message, log_id, False)
-    #         else:
-    #             for shopify_image in shopify_images:
-    #                 if int(image_id.shopify_image_id) == shopify_image.id:
-    #                     shopify_image.id = shopify_image.id
-    #                     shopify_image.position = image_id.sequence
-    #                     # shopify_image.alt = image_id.shopify_alt_text or ''
-    #                     shopify_image.attachment = image_id.image.decode('UTF-8')
-    #                     response = shopify_image.save()
-    #                     if response:
-    #                         message = 'Shopify Image ID : {}'.format(shopify_image.id)
-    #                         self.env['shopify.log.line'].generate_shopify_process_line('product', product_type,
-    #                                                                                    instance,
-    #                                                                                    message,
-    #                                                                                    False, message, log_id, False)
-    #                     break
-    #
-    #     # Deleting listing images in Shopify that will not exist in Odoo.
-    #     odoo_shopify_images = self.image_ids.mapped('shopify_image_id')
-    #     for shop_image in shopify_images:
-    #         if not str(shop_image.id) in odoo_shopify_images:
-    #             shop_image.destroy()
-    #     return True
-    #
+
+    def update_shopify_product_images(self, log_id, instance, product_type):
+        """
+                Export OR Update Images From Odoo To Shopify.
+                While Export OR Update Product First Fetch all the Product From Shopify If There is no Images Inside odoo, so we Destroy the Images in Shopify For that Listing.
+                Inside Listing Images available and Shopify Image ID not Set that we Export it to Shopify.
+                If Shopify Image ID Set then we Update the Data From odoo to Shopify.
+                After all process complete Check In Shopify Is there any Extra Images available If yes then we Destroy in Shopify (Compare with odoo listing image)
+            """
+        # self.ensure_one()
+        # update_api = (
+        #                 "{0}/wp-json/wc/v3/products/{1}".format(
+        #                     self.woocommerce_instance.woocommerce_url,
+        #                     self.woocommerce_product_id
+        #                 ))
+        # update_status, update_response, _ = self.woocommerce_instance.woocommerce_api_calling_process(
+        #     "POST", update_api, update_data
+        # )
+
+        # self.ensure_one()
+        #
+        # # Deleting listing images in Shopify if no images available in Odoo.
+        # shopify_images = shopify.Image().find(product_id=self.shopify_product_id)
+        # if not self.image_ids and shopify_images:
+        #     for shop_image in shopify_images:
+        #         shop_image.destroy()
+        #     return False
+        # for image_id in self.image_ids:
+        #     if not image_id.shopify_image_id and image_id.image:
+        #         shopify_image = shopify.Image()
+        #         shopify_image.product_id = self.shopify_product_id
+        #         shopify_image.position = image_id.sequence
+        #         shopify_image.attachment = image_id.image.decode('UTF-8')
+        #         # shopify_image.alt = image_id.shopify_alt_text or ''
+        #         shopify_image.variant_ids = image_id.listing_item_ids.mapped('shopify_product_variant_id')
+        #         response = shopify_image.save()
+        #         if response:
+        #             image_id.shopify_image_id = shopify_image.id
+        #             message = 'Shopify Image ID : {}'.format(shopify_image.id)
+        #             self.env['shopify.log.line'].generate_shopify_process_line('product', product_type, instance,
+        #                                                                        message,
+        #                                                                        False, message, log_id, False)
+        #     else:
+        #         for shopify_image in shopify_images:
+        #             if int(image_id.shopify_image_id) == shopify_image.id:
+        #                 shopify_image.id = shopify_image.id
+        #                 shopify_image.position = image_id.sequence
+        #                 # shopify_image.alt = image_id.shopify_alt_text or ''
+        #                 shopify_image.attachment = image_id.image.decode('UTF-8')
+        #                 response = shopify_image.save()
+        #                 if response:
+        #                     message = 'Shopify Image ID : {}'.format(shopify_image.id)
+        #                     self.env['shopify.log.line'].generate_shopify_process_line('product', product_type,
+        #                                                                                instance,
+        #                                                                                message,
+        #                                                                                False, message, log_id, False)
+        #                 break
+        #
+        # # Deleting listing images in Shopify that will not exist in Odoo.
+        # odoo_shopify_images = self.image_ids.mapped('shopify_image_id')
+        # for shop_image in shopify_images:
+        #     if not str(shop_image.id) in odoo_shopify_images:
+        #         shop_image.destroy()
+        # return True
+
     def get_odoo_product_category(self, product_type):
         """
         This method is used to find Product category & if not found then create new one.
@@ -986,8 +996,9 @@ class WooCommerceProductListing(models.Model):
             product_queue_line.number_of_fails += 1
             error_msg = "Product SKU not found in WooCommerce product data"
             self.env['woocommerce.log.line'].with_context(
-                for_variant_line=product_queue_line).generate_woocommerce_process_line('product','import',instance,
-                error_msg,False,error_msg,log_id,True)
+                for_variant_line=product_queue_line).generate_woocommerce_process_line('product', 'import', instance,
+                                                                                       error_msg, False, error_msg,
+                                                                                       log_id, True)
             return False
 
             # Step 2: Find/Create Product Listing and listing item
@@ -1032,7 +1043,8 @@ class WooCommerceProductListing(models.Model):
         try:
             if product_listing_id:
                 api_url = f"{instance.woocommerce_url}/wp-json/wc/v3/products/{product_listing_id}"
-                response_status, response_data,next_page_link = instance.woocommerce_api_calling_process("GET", api_url)
+                response_status, response_data, next_page_link = instance.woocommerce_api_calling_process("GET",
+                                                                                                          api_url)
                 return response_data if response_status else False
             return eval(product_queue_line.product_data_to_process)
         except Exception as e:
@@ -1068,8 +1080,9 @@ class WooCommerceProductListing(models.Model):
                 woocommerce_tag = woocommerce_tag_obj.search([("name", "=", tags_name)], limit=1)
                 if not woocommerce_tag:
                     sequence += 1
-                    woocommerce_tag = self.env['woocommerce.product.tags'].create({'name': tags_name, 'code': tags_id, 'instance_id': instance.id,
-                                 'company_id': instance.company_id.id, 'slug': slug,"sequence":sequence})
+                    woocommerce_tag = self.env['woocommerce.product.tags'].create(
+                        {'name': tags_name, 'code': tags_id, 'instance_id': instance.id,
+                         'company_id': instance.company_id.id, 'slug': slug, "sequence": sequence})
                 sequence = woocommerce_tag.sequence if woocommerce_tag else 0
                 tag_ids.append(woocommerce_tag.id)
 
@@ -1081,7 +1094,7 @@ class WooCommerceProductListing(models.Model):
             "product_catg_id": product_category.id,
             "exported_in_woocommerce": True,
             "woocommerce_default_code": product_data.get('sku'),
-            "tag_ids":tag_ids
+            "tag_ids": tag_ids
         }
         if not listing:
             listing = self.create(product_listing_vals)
@@ -1130,7 +1143,7 @@ class WooCommerceProductListing(models.Model):
             template = variant.product_tmpl_id
             template.write({
                 'name': product_data.get('name'),
-                'description':product_data.get('description'),
+                'description': product_data.get('description'),
                 'type': 'product',
                 'categ_id': product_category.id,
             })
@@ -1232,7 +1245,9 @@ class WooCommerceProductListing(models.Model):
 
         while variant_api_url:
             params = "per_page=100"
-            response_status, response_data, next_page_link =instance.woocommerce_api_calling_process("GET", variant_api_url,False,params)
+            response_status, response_data, next_page_link = instance.woocommerce_api_calling_process("GET",
+                                                                                                      variant_api_url,
+                                                                                                      False, params)
             if not response_status or not response_data:
                 break
             product_variant_response_data.extend(response_data)  # to avoid list of list we use extend not append

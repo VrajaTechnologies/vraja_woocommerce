@@ -10,5 +10,7 @@ class ProductTemplate(models.Model):
             'res_model': 'prepare.product.for.export.woocommerce.instance',
             'view_mode': 'form',
             'target': 'new',
-            'context': {'active_ids': self.ids},
+            'context': {
+                    'active_ids': self.ids,
+                    },
         }

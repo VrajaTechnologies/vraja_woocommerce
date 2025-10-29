@@ -6,7 +6,9 @@
         <field name="arch" type="xml">
             <form string="Export Instance Wizard Form">
                 <group>
-                    <field name="woocommerce_instance"/>
+                    <field name="woocommerce_instance_id"/>
+                    <field name="set_price" widget="boolean_toggle"/>
+                    <field name="set_image" widget="boolean_toggle"/>
                 </group>
                 <footer>
                     <button string="Export" type="object" name="prepare_product_for_export_woocommerce_instance" class="btn-primary"/>
