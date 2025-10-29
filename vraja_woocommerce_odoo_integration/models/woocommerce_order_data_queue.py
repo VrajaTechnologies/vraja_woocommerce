@@ -103,7 +103,7 @@ class WooCommerceOrderDataQueue(models.Model):
                                                                             woocommerce_order_ids)
         if woocommerce_order_list:
             res_id_list = self.create_woocommerce_order_queue_job(instance, woocommerce_order_list)
-            # instance.woocommerce_last_synced_order_date = to_date
+            instance.woocommerce_last_synced_order_date = to_date
             return res_id_list
 
     def process_woocommerce_order_queue(self, instance_id=False):

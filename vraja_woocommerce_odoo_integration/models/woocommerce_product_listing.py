@@ -1100,6 +1100,11 @@ class WooCommerceProductListing(models.Model):
             listing = self.create(product_listing_vals)
         else:
             listing.write(product_listing_vals)
+        price = float(product_data.get('price') or 0.0)
+        if product_data.get("type")=="simple":
+            instance.woocommerce_price_list_id.set_woocommerce_product_price(
+                listing.product_tmpl_id.product_variant_id.id, price
+            )
         return listing
 
     def create_or_update_product_template(self, product_data, product_category, instance,
@@ -1169,6 +1174,7 @@ class WooCommerceProductListing(models.Model):
             'default_code': product_data.get('sku'),
         }
         template = product_template_obj.create(vals)
+
         return template
 
     def sync_template_attributes(self, product_data, product_template):

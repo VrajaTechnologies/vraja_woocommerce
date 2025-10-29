@@ -56,6 +56,12 @@ class WooCommerceInstanceIntegrations(models.Model):
     is_sync_wc_images = fields.Boolean("Sync Product Images?",
                                        help="If true then Images will be sync at the time of Import Products.",
                                        default=False)
+    woocommerce_discount_product_id = fields.Many2one('product.product', string="Discount Product", copy=False,
+                                                      default=lambda self: self.env.ref(
+                                                          'vraja_woocommerce_odoo_integration.discount_product', False),
+                                                      help="This product will be considered as a discount product for add \n"
+                                                           "sale order line")
+
     webhook_ids = fields.One2many("woocommerce.webhook", "instance_id", "Webhooks")
 
 

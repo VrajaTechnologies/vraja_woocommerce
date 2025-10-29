@@ -42,7 +42,8 @@ class WooCommerceOperations(models.TransientModel):
                                           ("import_payment_gateways", "Import Payment Gateways"),
                                           ("import_shipping_method", "Import Shipping Method"),
                                           ("import_product_category", "Import Product Category"),
-                                          ("import_product_tags", "Import Product Tags")],
+                                          ("import_product_tags", "Import Product Tags"),
+                                          ("import_taxes", "Import Taxes")],
                                          string='Import Operations', default='import_order')
 
     from_date_order = fields.Datetime(string='From Date')
@@ -85,6 +86,8 @@ class WooCommerceOperations(models.TransientModel):
             self.env['woocommerce.product.category'].import_product_category(instance)
         if self.import_operations == "import_product_tags":
             self.env['woocommerce.product.tags'].import_product_tags(instance)
+        if self.import_operations == "import_taxes":
+            self.env['woocommerce.taxes'].import_woocommerce_taxes(instance)
         if self.import_operations == "import_product":
             product_queue_ids = self.env['woocommerce.product.data.queue'].import_product_from_woocommerce_to_odoo(instance,
                                                                                                        self.from_date_product,

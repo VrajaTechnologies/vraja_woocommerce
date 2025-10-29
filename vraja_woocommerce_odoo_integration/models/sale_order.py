@@ -66,61 +66,67 @@ class SaleOrder(models.Model):
     def create_or_update_payment_gateway_and_workflow(self, woocommerce_order_dictionary, instance_id, line):
         woocommerce_financial_status_object = self.env["woocommerce.financial.status.configuration"]
         payment_gateway_obj = self.env["woocommerce.payment.gateway"]
+        try:
+            # below code was used for find financial status from order response
+            if (woocommerce_order_dictionary.get("transaction_id")) or (
+                    woocommerce_order_dictionary.get("date_paid") and woocommerce_order_dictionary.get(
+                "payment_method") != "cod" and woocommerce_order_dictionary.get(
+                "status") == "processing"):
+                financial_status = "paid"
+            else:
+                financial_status = "not_paid"
 
-        # below code was used for find financial status from order response
-        if (woocommerce_order_dictionary.get("transaction_id")) or (
-                woocommerce_order_dictionary.get("date_paid") and woocommerce_order_dictionary.get(
-            "payment_method") != "cod" and woocommerce_order_dictionary.get(
-            "status") == "processing"):
-            financial_status = "paid"
-        else:
-            financial_status = "not_paid"
+            # below code was used for find payment gateway object
+            code = woocommerce_order_dictionary.get("payment_method", "")
+            name = woocommerce_order_dictionary.get("payment_method_title", "")
+            if not code:
+                code = "no_payment_method"
+                name = "No Payment Method"
 
-        # below code was used for find payment gateway object
-        code = woocommerce_order_dictionary.get("payment_method", "")
-        name = woocommerce_order_dictionary.get("payment_method_title", "")
-        if not code:
-            code = "no_payment_method"
-            name = "No Payment Method"
+            # Check order for full discount, when there is no payment gateway found.
+            total_discount = 0
+            total = woocommerce_order_dictionary.get("total")
+            if woocommerce_order_dictionary.get("coupon_lines"):
+                total_discount = woocommerce_order_dictionary.get("discount_total")
+            if float(total) == 0 and float(total_discount) > 0:
+                no_payment_gateway = True
+            else:
+                no_payment_gateway = False
 
-        # Check order for full discount, when there is no payment gateway found.
-        total_discount = 0
-        total = woocommerce_order_dictionary.get("total")
-        if woocommerce_order_dictionary.get("coupon_lines"):
-            total_discount = woocommerce_order_dictionary.get("discount_total")
-        if float(total) == 0 and float(total_discount) > 0:
-            no_payment_gateway = True
-        else:
-            no_payment_gateway = False
+            # based on payment gateway we found financial status using below code
+            if no_payment_gateway:
+                payment_gateway = payment_gateway_obj.search([("code", "=", "no_payment_method"),
+                                                              ("instance_id", "=", instance_id.id)])
+                woocommerce_financial_status = woocommerce_financial_status_object.search(
+                    [("instance_id", "=", instance_id.id),
+                     ("financial_status", "=",
+                      financial_status),
+                     ("payment_gateway_id", "=",
+                      payment_gateway.id)],
+                    limit=1)
+            else:
+                payment_gateway = payment_gateway_obj.search_or_create_woocommerce_payment_gateway(instance_id,
+                                                                                                   code=code,
+                                                                                                   name=name)
+                woocommerce_financial_status = woocommerce_financial_status_object.search(
+                    [('instance_id', '=', instance_id.id), ('payment_gateway_id.name', '=', payment_gateway.name),
+                     ('financial_status', '=', financial_status)], limit=1)
 
-        # based on payment gateway we found financial status using below code
-        if no_payment_gateway:
-            payment_gateway = payment_gateway_obj.search([("code", "=", "no_payment_method"),
-                                                          ("instance_id", "=", instance_id.id)])
-            woocommerce_financial_status = woocommerce_financial_status_object.search(
-                [("instance_id", "=", instance_id.id),
-                 ("financial_status", "=",
-                  financial_status),
-                 ("payment_gateway_id", "=",
-                  payment_gateway.id)],
-                limit=1)
-        else:
-            payment_gateway = payment_gateway_obj.search_or_create_woocommerce_payment_gateway(instance_id, code=code,
-                                                                                               name=name)
-            woocommerce_financial_status = woocommerce_financial_status_object.search(
-                [('instance_id', '=', instance_id.id), ('payment_gateway_id.name', '=', payment_gateway.name),
-                 ('financial_status', '=', financial_status)], limit=1)
+            if not woocommerce_financial_status:
+                message = "We cant find financial status for order number- {0}".format(
+                    woocommerce_order_dictionary.get("number"))
+                return False, None, message, True, 'failed'
 
-        if not woocommerce_financial_status:
-            message = "We cant find financial status for order number- {0}".format(
-                woocommerce_order_dictionary.get("number"))
-            return False, message, True, 'failed'
-
-        if not woocommerce_financial_status.sale_auto_workflow_id.policy_of_picking:
-            message = "We cant find policy of picking in sale auto workflow - {0} for order {1}".format(
-                woocommerce_financial_status.sale_auto_workflow_id, woocommerce_order_dictionary.get("number"))
-            return False, message, True, 'failed'
-        return woocommerce_financial_status
+            if not woocommerce_financial_status.sale_auto_workflow_id.policy_of_picking:
+                message = "We cant find policy of picking in sale auto workflow - {0} for order {1}".format(
+                    woocommerce_financial_status.sale_auto_workflow_id, woocommerce_order_dictionary.get("number"))
+                return False, None, message, True, 'failed'
+            return True, woocommerce_financial_status, "Financial status found successfully", False, 'completed'
+        except Exception as e:
+            msg = "Unexpected error finding financial status for order {0}: {1}".format(
+                woocommerce_order_dictionary.get("number"), str(e)
+            )
+            return False, None, msg, True, 'failed'
 
     def prepare_vals_for_sale_order_line(self, price, quantity, product_id, sale_order_id,
                                          is_delivery=False):
@@ -135,28 +141,105 @@ class SaleOrder(models.Model):
         return vals
 
     def create_woocommerce_sale_order_line(self, sale_order_id, woocommerce_order_dictionary, woocommerce_taxes,
-                                           instance_id=instance_id,
+                                           instance_id,
                                            log_id=False, order_queue_line=False):
         woocommerce_order_lines = woocommerce_order_dictionary.get("line_items")
         if isinstance(woocommerce_order_lines, dict):
             woocommerce_order_lines = [woocommerce_order_lines]
         message = ''
+        skip_auto_workflow = False
         for order_line_data in woocommerce_order_lines:
             product_sku = order_line_data.get("sku")
+            if not product_sku:
+                message = "Skipping the order line of order {1} because this order line product {0} has a no product SKU".format(
+                    order_line_data.get('name'),woocommerce_order_dictionary.get('110'))
+                self.env['woocommerce.log.line'].generate_woocommerce_process_line('order', 'import', instance_id,
+                                                                                   message, False,
+                                                                                   woocommerce_order_dictionary,
+                                                                                   log_id, True)
+                sale_order_id.message_post(body=message)
+                skip_auto_workflow = True
+                continue
             product_id = self.env['product.product'].search([("default_code", "=", product_sku)],
                                                             limit=1)  # need to replace find product related code
+            # need to add create product in odoo code
+            if not product_id:
+                product_listing_id = self.env['woocommerce.product.listing'].woocommerce_create_products(
+                    product_queue_line=False, instance=instance_id, log_id=log_id,
+                    order_line_product_listing_id=order_line_data.get('product_id'))
+                if product_listing_id:
+                    product_id = self.env['product.product'].search([("default_code", "=", product_sku)],
+                                                            limit=1)
             if not product_id:
                 message = "Product {0} - {1} not found for Order {2}".format(
                     order_line_data.get("sku"), order_line_data.get("name"), woocommerce_order_dictionary.get('number'))
-                return False, message, True, 'failed'
+                self.env['woocommerce.log.line'].generate_woocommerce_process_line('order', 'import', instance_id,
+                                                                                   message, False,
+                                                                                   woocommerce_order_dictionary,
+                                                                                   log_id, True)
+                sale_order_id.message_post(body=message)
+                skip_auto_workflow = True
+                continue
+                # return False, message, True, 'failed'
 
-            order_line_vals = self.prepare_vals_for_sale_order_line(order_line_data.get('price'),
+            order_line_vals = self.prepare_vals_for_sale_order_line(order_line_data.get('total'),
                                                                     order_line_data.get('quantity'), product_id,
                                                                     sale_order_id)
+
+            # order_line_vals.update({'price'})
+            if order_line_data.get('taxes'):
+                line_taxes = []
+                for taxes in order_line_data.get('taxes'):
+                    odoo_tax_id = self.env['account.tax'].search([
+                        ('woocommerce_tax_id.woocommerce_tax_id', '=', taxes.get('id'))
+                    ], limit=1)
+
+                    if odoo_tax_id:
+                        line_taxes.append(odoo_tax_id.id)
+                    else:
+                        skip_auto_workflow = True
+                        order_queue_line.state = 'failed'
+                        error_msg = (
+                            "Woocommerce Tax ID {0} not found in account tax. "
+                            "Please configure it and then add it in order line."
+                        ).format(taxes.get('id'))
+
+                        self.env['woocommerce.log.line'].with_context(
+                            for_variant_line=order_queue_line
+                        ).generate_woocommerce_process_line(
+                            'order', 'import', instance_id, error_msg, False, error_msg, log_id, True
+                        )
+
+                if line_taxes:
+                    order_line_vals.update({"tax_id": [(6, 0, line_taxes)]})
             # order_line_vals.update({'shopify_order_line_id': order_line_data.get('id')})
             sale_order_line = self.env['sale.order.line'].create(order_line_vals)
+            description_parts = []
+
+            # 1️⃣ Add product name / existing description
+            if sale_order_line.name:
+                description_parts.append(sale_order_line.name)
+            elif product_id.name:
+                description_parts.append(product_id.name)
+
+            # 2️⃣ Add WooCommerce line description (if available)
+            if order_line_data.get('name'):
+                description_parts.append(order_line_data.get('name'))
+
+            # 3️⃣ Add discount info if available
+            discount_total = float(order_line_data.get('subtotal')) - float(order_line_data.get('total'))
+            if discount_total > 0:
+                description_parts.append(
+                    "Discount applied: -{0:.2f}".format(discount_total)
+                )
+                # # Optionally update discount field
+                # sale_order_line.discount = (discount_total / float(order_line_data.get('subtotal') or 1.0)) * 100
+
+            # 4️⃣ Update the line's name field
+            sale_order_line.name = "\n".join(description_parts)
             sale_order_line.with_context(round=False)._compute_amount()
-        return True, message, False, 'draft'
+
+        return True, message, False, 'draft', skip_auto_workflow
 
     def convert_woocommerce_order_date(self, order_response):
         if order_response.get("date_created", False):
@@ -259,6 +342,7 @@ class SaleOrder(models.Model):
                 fee_line_vals = self.prepare_vals_for_sale_order_line(total_fee, 1,
                                                                       instance_id.woocommerce_fee_product_id,
                                                                       sale_order_id, True)
+                # fee_line_vals.update({'price_unit': total_fee})
                 fee_line_id = self.env['sale.order.line'].create(fee_line_vals)
                 _logger.info("Fee line is created for the sale order %s.", self.name)
         return True
@@ -304,13 +388,17 @@ class SaleOrder(models.Model):
             return False, error_msg, True, 'partially_completed'
 
     def check_automatic_workflow_process_for_woocommerce_order(self, instance_id, woocommerce_order_dictionary,
-                                                               sale_order_id, financial_status):
+                                                               sale_order_id, financial_status, skip_auto_workflow):
         result = False
         log_msg = ''
         fault_or_not = False
         line_state = ''
         sale_auto_workflow_id = financial_status.sale_auto_workflow_id
-
+        if skip_auto_workflow:
+            result = True
+            log_msg = "Order Created Successfully without perform sale auto workflow"
+            line_state = 'completed'
+            return result, log_msg, fault_or_not, line_state
         # This code confirms a sale order if the "confirm sale order" field is true in the sales auto workflow.
         if sale_auto_workflow_id and sale_auto_workflow_id.confirm_sale_order:
             result, log_msg, fault_or_not, line_state = self.auto_confirm_woocommerce_sale_order(sale_order_id)
@@ -320,6 +408,16 @@ class SaleOrder(models.Model):
                 sale_auto_workflow_id and sale_auto_workflow_id.confirm_sale_order and sale_auto_workflow_id.validate_delivery_order and
                 sale_order_id.state == 'sale'):
             result, log_msg, fault_or_not, line_state = self.auto_validate_woocommerce_delivery_order(sale_order_id)
+
+        #  If no workflow actions were triggered, still mark process as successful (not failed)
+        if not sale_auto_workflow_id or (
+                not sale_auto_workflow_id.confirm_sale_order
+                and not sale_auto_workflow_id.validate_delivery_order
+        ):
+            result = True
+            log_msg = "Sale order created successfully (no automatic workflow applied)"
+            fault_or_not = False
+            line_state = 'completed'
 
         return result, log_msg, fault_or_not, line_state
 
@@ -342,11 +440,10 @@ class SaleOrder(models.Model):
             line.sale_order_id = existing_order.id
             msg = "Order Number {0} - {1}".format(existing_order.name, "Is Already Exist In Odoo")
             return True, msg, False, 'completed'
-        financial_status = self.create_or_update_payment_gateway_and_workflow(woocommerce_order_dictionary, instance_id,
-                                                                              line)
-        if not financial_status:
-            message = "We cant find financial status for order number- {0}".format(
-                woocommerce_order_dictionary.get("number"))
+        success, financial_status, message, is_error, state = self.create_or_update_payment_gateway_and_workflow(
+            woocommerce_order_dictionary, instance_id,
+            line)
+        if not success or not financial_status:
             return False, message, True, 'failed'
         customer_id = self.find_create_woocommerce_customer_in_odoo(instance_id, woocommerce_order_dictionary,
                                                                     log_id=False, line=False)
@@ -388,18 +485,52 @@ class SaleOrder(models.Model):
         line.sale_order_id = sale_order_id.id  # this line used for set the sale order id in order queue line sale order field
         tax_included = woocommerce_order_dictionary.get("prices_include_tax")
         if sale_order_id:
-            order_lines, msg, fault_or_not, line_state = sale_order_id.create_woocommerce_sale_order_line(sale_order_id,
-                                                                                                          woocommerce_order_dictionary,
-                                                                                                          woocommerce_taxes,
-                                                                                                          instance_id=instance_id,
-                                                                                                          log_id=log_id,
-                                                                                                          order_queue_line=line)
+            order_lines, msg, fault_or_not, line_state, skip_auto_workflow = sale_order_id.create_woocommerce_sale_order_line(
+                sale_order_id,
+                woocommerce_order_dictionary,
+                woocommerce_taxes,
+                instance_id=instance_id,
+                log_id=log_id,
+                order_queue_line=line)
             if not order_lines:
                 return False, msg, True, line_state
             sale_order_id.woocommerce_create_shipping_fee_coupon_lines(instance_id, woocommerce_order_dictionary,
                                                                        tax_included, woocommerce_taxes, sale_order_id)
+            # if float(woocommerce_order_dictionary.get('discount_total', 0.0)) > 0.0:
+            #     # Extract coupon code(s)
+            #     coupon_lines = woocommerce_order_dictionary.get('coupon_lines', [])
+            #     coupon_codes = []
+            #     if coupon_lines:
+            #         for coupon in coupon_lines:
+            #             code = coupon.get('code')
+            #             if code:
+            #                 coupon_codes.append(code)
+            #
+            #     # Create a readable coupon name string
+            #     coupon_name = ', '.join(coupon_codes) if coupon_codes else 'Discount'
+            #
+            #     # Prepare discount order line values
+            #     order_line_vals = self.prepare_vals_for_sale_order_line(
+            #         float(woocommerce_order_dictionary.get('discount_total')) * -1,
+            #         1,
+            #         instance_id.woocommerce_discount_product_id,
+            #         sale_order_id
+            #     )
+            #
+            #     # Update order line with additional info
+            #     order_line_vals.update({
+            #         # 'price_unit': float(woocommerce_order_dictionary.get('discount_total')) * -1,
+            #         'name': f"Discount ({coupon_name})"
+            #     })
+            #
+            #     # Create sale order line
+            #     sale_order_line = self.env['sale.order.line'].create(order_line_vals)
+            #     sale_order_line.with_context(round=False)._compute_amount()
+
             check_process_status, log_msg, fault_or_not, line_state = self.check_automatic_workflow_process_for_woocommerce_order(
-                instance_id, woocommerce_order_dictionary, sale_order_id, financial_status)
-            if check_process_status:
-                msg = "sale order created successfully"
-                return True, msg, False, 'completed'
+                instance_id, woocommerce_order_dictionary, sale_order_id, financial_status, skip_auto_workflow)
+            # if check_process_status:
+            #     msg = "sale order created successfully" if not log_msg else log_msg
+            #     return True, msg, False, 'completed'
+            msg = "sale order created successfully" if not log_msg else log_msg
+            return check_process_status, msg, fault_or_not, line_state
