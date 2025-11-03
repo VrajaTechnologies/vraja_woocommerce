@@ -142,7 +142,7 @@ class CustomerDataQueueLine(models.Model):
     customer_queue_id = fields.Many2one('woocommerce.customer.data.queue', string='Customer Queue')
     res_partner_id = fields.Many2one("res.partner")
 
-    #
+
     def create_woocommerce_customer_queue_line(self, woocommerce_customer_dict, instance_id, queue_id):
         """This method used to create a woocommerce customer queue  line """
 

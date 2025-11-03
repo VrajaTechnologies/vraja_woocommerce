@@ -12,6 +12,17 @@
                 </p>
             </field>
         </record>
+        <record id="action_instance_woocommerce_product_listing" model="ir.actions.act_window">
+            <field name="name">Woocommerce Listing</field>
+            <field name="res_model">woocommerce.product.listing</field>
+            <field name="domain">[('woocommerce_instance_id', '=', active_id)]</field>
+            <field name='view_mode'>tree,form</field>
+            <field name="help" type="html">
+                <p class="oe_view_nocontent_create">
+                    Woocommerce Product listing will display here.
+                </p>
+            </field>
+        </record>
         <!--form view-->
         <record id="woocommerce_instance_integration_form" model="ir.ui.view">
             <field name="name">woocommerce instance integration form</field>
@@ -241,17 +252,7 @@
                 </p>
             </field>
         </record>
-        <record id="action_instance_woocommerce_product_listing" model="ir.actions.act_window">
-            <field name="name">Woocommerce Listing</field>
-            <field name="res_model">woocommerce.product.listing</field>
-            <field name="domain">[('woocommerce_instance_id', '=', active_id)]</field>
-            <field name='view_mode'>tree,form</field>
-            <field name="help" type="html">
-                <p class="oe_view_nocontent_create">
-                    Woocommerce Product listing will display here.
-                </p>
-            </field>
-        </record>
+
 
 
         <!--kanban view-->

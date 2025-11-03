@@ -492,6 +492,7 @@ class PrepareProductForExportWoocommerceInstance(models.TransientModel):
                                 False, f"Exception while updating variant '{product_variant.name}'",
                                 log_id, True
                             )
+
         self.env.cr.commit()
         if non_storable_products:
             names = ", ".join(non_storable_products.mapped("name"))

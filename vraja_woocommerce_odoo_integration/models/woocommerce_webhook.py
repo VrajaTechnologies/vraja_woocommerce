@@ -50,8 +50,8 @@ class WoocommerceWebhook(models.Model):
         current_url = instance_obj.get_base_url()
         url = current_url + route
         _logger.info("Webhook URL : %s", url)
-        # if url[:url.find(":")] == 'http':
-        #     raise UserError(_("Address protocol http:// is not supported for creating the webhooks."))
+        if url[:url.find(":")] == 'http':
+            raise UserError(_("Address protocol http:// is not supported for creating the webhooks."))
 
         webhook_vals = {
             "name": self.webhook_name,
