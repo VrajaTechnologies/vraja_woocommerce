@@ -1,2 +1,3 @@
 from . import woocommerce_operations
 from . import prepare_product_for_export_woocommerce_instance
+from . import woocommerce_export_product_category

@@ -7,7 +7,6 @@ class ProcessDetail(models.Model):
     _inherit = ['mail.thread']
     _order = 'id DESC'
 
-
     name = fields.Char(string='Name')
     woocommerce_operation_name = fields.Selection([('gateway', 'Gateway'),
                                                    ('shipping', 'Shipping'),
@@ -18,7 +17,7 @@ class ProcessDetail(models.Model):
                                                    ('product_variant', 'Product Variant'),
                                                    ('product_category', 'Product Category'),
                                                    ('product_tags', 'Product tags'),
-                                                   ('order', 'Order'), ('inventory', 'Inventory'),('tax', 'Tax')],
+                                                   ('order', 'Order'), ('inventory', 'Inventory'), ('tax', 'Tax')],
                                                   string="Process Name")
     woocommerce_operation_type = fields.Selection([('export', 'Export'),
                                                    ('import', 'Import'),
@@ -74,7 +73,7 @@ class ProcessDetailsLine(models.Model):
                                                    ('product_variant', 'Product Variant'),
                                                    ('product_category', 'Product Category'),
                                                    ('product_tags', 'Product tags'),
-                                                   ('order', 'Order'), ('inventory', 'Inventory'),('tax','tax')],
+                                                   ('order', 'Order'), ('inventory', 'Inventory'), ('tax', 'tax')],
                                                   string="Process Name")
 
     woocommerce_operation_type = fields.Selection([('export', 'Export'),

@@ -120,7 +120,6 @@ class WooCommerceProductListing(models.Model):
         self.env['woocommerce.log.line'].generate_woocommerce_process_line(model, operation, instance, message, False,
                                                                            message, log_id, error)
 
-
 # #
 # def action_product_publish(self):
 #     """Publish product on WooCommerce."""
