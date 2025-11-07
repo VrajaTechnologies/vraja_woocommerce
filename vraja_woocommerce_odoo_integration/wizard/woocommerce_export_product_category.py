@@ -1,6 +1,7 @@
 from odoo import models, fields
 import json
 
+
 class WoocommerceExportProductCategory(models.TransientModel):
     _name = "woocommerce.export.product.category"
 
@@ -95,12 +96,10 @@ class WoocommerceExportProductCategory(models.TransientModel):
                                 lambda c: c.name == wc_name and c.slug == original_slug)
                                 if current_cat:
                                     current_cat.write({"slug": wc_slug, "code": wc_id})
-
                             odoo_cat = self.env["woocommerce.product.category"].search(['|', '|',
                                                                                         ("code", "=", wc_id),
                                                                                         ("name", "=", wc_name),
-                                                                                        ("slug", "=", wc_slug)
-                                                                                        ], limit=1)
+                                                                                        ("slug", "=", wc_slug)], limit=1)
                             if odoo_cat:
                                 odoo_cat.write({"code": wc_id})
                             else:
