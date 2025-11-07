@@ -78,6 +78,7 @@ class WooCommerceOrderDataQueue(models.Model):
         try:
             params = {'include': woocommerce_order_ids} if woocommerce_order_ids else {"after": from_date,
                                                                                        "before": to_date,
+                                                                                       'status': 'completed',
                                                                                        }
             params["per_page"] = 100
             url = "{0}/wp-json/wc/v3/orders".format(instance.woocommerce_url)

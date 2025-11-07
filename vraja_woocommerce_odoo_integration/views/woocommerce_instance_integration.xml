@@ -12,6 +12,17 @@
                 </p>
             </field>
         </record>
+        <record id="action_woocommerce_order_id" model="ir.actions.act_window">
+            <field name="name">Woocommerce Order</field>
+            <field name="res_model">sale.order</field>
+            <field name="view_id" ref="sale.view_quotation_tree_with_onboarding"/>
+            <field name="domain">[('instance_id', '=', active_id)]</field>
+            <field name="help" type="html">
+                <p class="o_view_nocontent_smiling_face">
+                    Woocommerce Order will display here
+                </p>
+            </field>
+        </record>
         <record id="action_instance_woocommerce_product_listing" model="ir.actions.act_window">
             <field name="name">Woocommerce Listing</field>
             <field name="res_model">woocommerce.product.listing</field>
@@ -20,6 +31,17 @@
             <field name="help" type="html">
                 <p class="oe_view_nocontent_create">
                     Woocommerce Product listing will display here.
+                </p>
+            </field>
+        </record>
+        <record id="action_instance_woocommerce_cronjob" model="ir.actions.act_window">
+            <field name="name">Woocommerce Cronjob</field>
+            <field name="res_model">ir.cron</field>
+            <field name="domain">[('woocommerce_instance', '=', active_id)]</field>
+            <field name='view_mode'>tree,form</field>
+            <field name="help" type="html">
+                <p class="oe_view_nocontent_create">
+                    Woocommerce Cron Job will display here.
                 </p>
             </field>
         </record>
@@ -36,7 +58,7 @@
                     <sheet>
                         <div class="oe_button_box" name="button_box">
                             <button class="oe_stat_button" type="action"
-                                    name="%(vraja_woocommerce_odoo_integration.action_woocommerce_customer_id)d"
+                                    name="%(vraja_woocommerce_odoo_integration.action_instance_woocommerce_cronjob)d"
                                     string="Cron"
                                     icon="fa-clock-o"/>
                             <button class="oe_stat_button" type="action"
@@ -241,17 +263,6 @@
 
         <!--        Action  of customer , product listing, and order-->
 
-        <record id="action_woocommerce_order_id" model="ir.actions.act_window">
-            <field name="name">Woocommerce Order</field>
-            <field name="res_model">sale.order</field>
-            <field name="view_id" ref="sale.view_quotation_tree_with_onboarding"/>
-            <field name="domain">[('instance_id', '=', active_id)]</field>
-            <field name="help" type="html">
-                <p class="o_view_nocontent_smiling_face">
-                    Woocommerce Order will display here
-                </p>
-            </field>
-        </record>
 
 
 
