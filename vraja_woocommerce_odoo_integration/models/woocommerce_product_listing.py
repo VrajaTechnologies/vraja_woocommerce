@@ -1,10 +1,12 @@
 import pytz
 import logging
 import requests
+import json
 from dateutil import parser
 from odoo import models, fields, api, _
 from odoo.exceptions import AccessError, ValidationError
 import base64
+
 _logger = logging.getLogger("Import Order Process:")
 utc = pytz.utc
 
@@ -64,48 +66,131 @@ class WooCommerceProductListing(models.Model):
     exported_in_woocommerce = fields.Boolean(default=False)
     total_variants_in_woocommerce = fields.Integer("Total Variants",
                                                    compute="compute_count_of_woocommerce_product_variants")
-
     # published_at = fields.Datetime("Published Date")
     image_ids = fields.One2many('woocommerce.product.image', 'woocommerce_listing_id', 'Images')
+    is_published = fields.Boolean(string="is_published", copy=False, default=True)
 
-    #
-    # def sync_product_image_from_shopify(self, shopify_instance_id, shopify_listing_id, shopify_product_dict):
-    #     shopify_image_response_vals = shopify_product_dict.get('images', {})
-    #     shopify_product_image = self.env['shopify.product.image']
-    #     shopify_listing_item_obj = self.env['shopify.product.listing.item']
-    #     if not shopify_image_response_vals:
-    #         shopify_instance_id.test_shopify_connection()
-    #         images = shopify.Image().find(product_id=shopify_listing_id.shopify_product_id)
-    #         shopify_image_response_vals = [image.to_dict() for image in images]
-    #     for image in shopify_image_response_vals:
-    #         image_url = image.get('src')
-    #         if image_url:
-    #             variant_ids, shopify_image_id = image.get('variant_ids'), image.get('id')
-    #             shopify_listing_item_ids = shopify_listing_item_obj.search(
-    #                 [('shopify_instance_id', '=', shopify_instance_id.id),
-    #                  ('shopify_product_listing_id', 'in', variant_ids)])
-    #             listing_image_id = shopify_product_image.search([('shopify_image_id', '=', shopify_image_id)])
-    #             image_datas = base64.b64encode(requests.get(image_url).content)
-    #             vals = {
-    #                 'name': shopify_listing_id.name,
-    #                 'shopify_image_id': shopify_image_id,
-    #                 'sequence': image.get('position'),
-    #                 'image': image_datas,
-    #                 'shopify_listing_id': shopify_listing_id.id,
-    #                 'listing_item_ids': [(6, 0, shopify_listing_item_ids.ids)],
-    #             }
-    #             if listing_image_id:
-    #                 listing_image_id.write(vals)
-    #             else:
-    #                 shopify_product_image.create(vals)
-    #
-    #             for listing_item in shopify_listing_item_ids:
-    #                 listing_item.product_id.write({'image_1920': image_datas})
-    #
-    #             if image.get('position') == 1:
-    #                 shopify_listing_id.product_tmpl_id.write({'image_1920': image_datas})
-    #     return True
-    #
+    def action_product_publish(self):
+        if not self.woocommerce_product_id:
+            return
+        log_id = self.env['woocommerce.log'].generate_woocommerce_logs("product", "update",self.woocommerce_instance_id,"Product Export Process Started")
+        try:
+            product_data = {"status": "publish"}
+            product_json = json.dumps(product_data)
+            url = "{0}/wp-json/wc/v3/products/{1}".format(self.woocommerce_instance_id.woocommerce_url,
+                                                          self.woocommerce_product_id)
+            response_status, response_data, next_page_link = self.woocommerce_instance_id.woocommerce_api_calling_process(
+                "POST", url, product_json)
+            if response_status:
+                self.is_published = True
+                result = response_data
+                message = f"Product published successfully. (WooCommerce ID: {result.get('id')})"
+                self._log_woocommerce_process('product', 'update', self.woocommerce_instance_id, message, log_id, False)
+            else:
+                message = f"Product can not published successfully. (woocommerce ID: {self.woocommerce_product_id})."
+                self._log_woocommerce_process('product', 'update', self.woocommerce_instance_id, message, log_id, True)
+        except Exception as e:
+            message = f"Product failed to publish.(woocommerce ID: {self.woocommerce_product_id}).  Error: {e}"
+            self._log_woocommerce_process('product', 'update', self.woocommerce_instance_id, message, log_id, True)
+
+    def action_product_unpublish(self):
+        if not self.woocommerce_product_id:
+            return
+        log_id = self.env['woocommerce.log'].generate_woocommerce_logs("product", "update", self.woocommerce_instance_id,"Product Export Process Started")
+        try:
+            product_data = {"status": "draft"}
+            product_json = json.dumps(product_data)
+            url = "{0}/wp-json/wc/v3/products/{1}".format(self.woocommerce_instance_id.woocommerce_url,
+                                                          self.woocommerce_product_id)
+            response_status, response_data, next_page_link = self.woocommerce_instance_id.woocommerce_api_calling_process(
+                "POST", url, product_json)
+            if response_status:
+                self.is_published = False
+                result = response_data
+                message = f"Product unpublished successfully. (WooCommerce ID: {result.get('id')})"
+                self._log_woocommerce_process('product', 'update', self.woocommerce_instance_id, message, log_id, False)
+            else:
+                message = f"Product can not unpublished successfully. (woocommerce ID: {self.woocommerce_product_id})."
+                self._log_woocommerce_process('product', 'update', self.woocommerce_instance_id, message, log_id, True)
+        except Exception as e:
+            message = f"Product failed to unpublish. (woocommerce ID: {self.woocommerce_product_id}).  Error: {e}"
+            self._log_woocommerce_process('product', 'update', self.woocommerce_instance_id, message, log_id, True)
+
+    def _log_woocommerce_process(self, model, operation, instance, message, log_id, error=False):
+        self.env['woocommerce.log.line'].generate_woocommerce_process_line(model, operation, instance, message, False,
+                                                                           message, log_id, error)
+
+# #
+# def action_product_publish(self):
+#     """Publish product on WooCommerce."""
+#     for rec in self:
+#         if not rec.woocommerce_product_id:
+#             continue
+#
+#         creds = rec._get_woocommerce_credentials()
+#         url = f"{rec._get_woocommerce_api_url()}/products/{rec.woocommerce_product_id}"
+#         data = {"status": "publish"}
+#
+#         response = requests.put(url, auth=(creds["consumer_key"], creds["consumer_secret"]), json=data)
+#         if response.status_code in [200, 201]:
+#             rec.write({'state': 'published', 'is_published': True})
+#         else:
+#             raise ValueError(f"Failed to publish product: {response.text}")
+#
+# def action_product_unpublish(self):
+#     """Unpublish product from WooCommerce."""
+#     for rec in self:
+#         if not rec.woocommerce_product_id:
+#             continue
+#
+#         creds = rec._get_woocommerce_credentials()
+#         url = f"{rec._get_woocommerce_api_url()}/products/{rec.woocommerce_product_id}"
+#         data = {"status": "draft"}
+#
+#         response = requests.put(url, auth=(creds["consumer_key"], creds["consumer_secret"]), json=data)
+#         if response.status_code in [200, 201]:
+#             rec.write({'state': 'unpublished', 'is_published': False})
+#         else:
+#             raise ValueError(f"Failed to unpublish product: {response.text}")
+
+
+# def sync_product_image_from_shopify(self, shopify_instance_id, shopify_listing_id, shopify_product_dict):
+#     shopify_image_response_vals = shopify_product_dict.get('images', {})
+#     shopify_product_image = self.env['shopify.product.image']
+#     shopify_listing_item_obj = self.env['shopify.product.listing.item']
+#     if not shopify_image_response_vals:
+#         shopify_instance_id.test_shopify_connection()
+#         images = shopify.Image().find(product_id=shopify_listing_id.shopify_product_id)
+#         shopify_image_response_vals = [image.to_dict() for image in images]
+#     for image in shopify_image_response_vals:
+#         image_url = image.get('src')
+#         if image_url:
+#             variant_ids, shopify_image_id = image.get('variant_ids'), image.get('id')
+#             shopify_listing_item_ids = shopify_listing_item_obj.search(
+#                 [('shopify_instance_id', '=', shopify_instance_id.id),
+#                  ('shopify_product_listing_id', 'in', variant_ids)])
+#             listing_image_id = shopify_product_image.search([('shopify_image_id', '=', shopify_image_id)])
+#             image_datas = base64.b64encode(requests.get(image_url).content)
+#             vals = {
+#                 'name': shopify_listing_id.name,
+#                 'shopify_image_id': shopify_image_id,
+#                 'sequence': image.get('position'),
+#                 'image': image_datas,
+#                 'shopify_listing_id': shopify_listing_id.id,
+#                 'listing_item_ids': [(6, 0, shopify_listing_item_ids.ids)],
+#             }
+#             if listing_image_id:
+#                 listing_image_id.write(vals)
+#             else:
+#                 shopify_product_image.create(vals)
+#
+#             for listing_item in shopify_listing_item_ids:
+#                 listing_item.product_id.write({'image_1920': image_datas})
+#
+#             if image.get('position') == 1:
+#                 shopify_listing_id.product_tmpl_id.write({'image_1920': image_datas})
+#     return True
+#
 
     def update_shopify_product_images(self, log_id, instance, product_type):
         """

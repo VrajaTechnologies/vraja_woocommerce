@@ -8,7 +8,7 @@ _logger = logging.getLogger("Woocommerce Controller")
 
 class MarketplaceProductImage(http.Controller):
 
-    @http.route(['/woocommerce/product/image/<string:encodedimage>'], type='http', auth='public')
+    @http.route("/woocommerce/product/image/<string:encodedimage>", type='http', auth='public')
     def retrive_woocommerce_product_image_from_url(self, encodedimage=''):
         if encodedimage:
             try:
@@ -32,9 +32,12 @@ class Main(http.Controller):
         Route for handling customer create webhook for Woocommerce. This route calls while new customer create
         in the Woocommerce store.
         """
+        _logger.info("Creating Customer at webhook...")
         webhook_route = request.httprequest.path.split('/')[1]
+        _logger.info("webhook route: %s", webhook_route)
         res, instance = self.get_basic_info(webhook_route)
         if not res:
+            _logger.info("returning...res not Found res in response")
             return
         if res.get("first_name") and res.get("last_name"):
             _logger.info("%s call for Customer: %s", webhook_route,
@@ -46,7 +49,7 @@ class Main(http.Controller):
         """
         This method used for call child method of customer create process.
         """
-        _logger.info("Woocommerce Customer response :: {}".format(res))
+        _logger.info("Woocommerce Customer response : {}".format(res))
         queue_id = request.env['customer.data.queue'].sudo().generate_woocommerce_customer_queue(instance_id)
         request.env['customer.data.queue.line'].sudo().create_woocommerce_customer_queue_line(res, instance_id,
                                                                                           queue_id)
@@ -57,13 +60,17 @@ class Main(http.Controller):
         This method is used to check that instance and webhook are active or not. If yes then return response and
         instance, If no then return response as False and instance.
         """
+        _logger.info("Getting basic info...")
         res = request.get_json_data()
         _logger.info("Get json data : ", res)
         host = request.httprequest.headers.get("X-woocommerce-Shop-Domain")
+        _logger.info("host: %s", host)
         instance = request.env["woocommerce.instance.integration"].sudo().with_context(active_test=False).search(
             [("woocommerce_url", "ilike", host)], limit=1)
+        _logger.info("Instance Data: %s", instance)
         webhook = request.env["woocommerce.webhook"].sudo().search([("delivery_url", "ilike", route),
                                                                 ("instance_id", "=", instance.id)], limit=1)
+        _logger.info("webhook data: %s", webhook)
         if not instance.active or not webhook.state == "active":
             _logger.info("The method is skipped. It appears the instance:%s is not active or that "
                          "the webhook %s is not active.", instance.name, webhook.webhook_name)

@@ -35,7 +35,11 @@
                                 <field name="woocommerce_instance_id" readonly="1"/>
                                 <field name="product_data_queue_id" readonly="1"/>
                                 <field name="woocommerce_product_id" readonly="1"/>
-                            </group>
+                                <button name="action_product_publish" type="object" string="Click to Publish" attrs="{'invisible': [('is_published', '=', True)]}"
+                                        t-attf-style="white-space:nowrap; display:inline-block; width:auto; min-width:unset;"/>
+                                <button name="action_product_unpublish" type="object" string="Click to Unpublish" attrs="{'invisible': [('is_published', '=', False)]}"
+                                        t-attf-style="white-space:nowrap; display:inline-block; width:auto; min-width:unset;"/>
+                            </group>S
                         </group>
 
                         <notebook>
@@ -50,6 +54,7 @@
                                     <group>
                                         <!--                                        <field name="website_published" readonly="1"/>-->
                                         <field name="exported_in_woocommerce" readonly="1"/>
+                                        <field name="is_published" invisible="1"/>
                                         <field name="total_variants_in_woocommerce" readonly="1"/>
                                         <field name="create_date" readonly="1"/>
                                         <field name="write_date" readonly="1"/>
@@ -76,7 +81,6 @@
                 </form>
             </field>
         </record>
-
         <!-- Action Woocommerce product listing-->
         <record id="action_woocommerce_product_listing" model="ir.actions.act_window">
             <field name="name">Woocommerce Listing</field>

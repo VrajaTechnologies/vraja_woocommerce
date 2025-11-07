@@ -10,6 +10,7 @@
         'security/ir.model.access.csv',
         'wizard/woocommerce_operations_view.xml',
         'wizard/prepare_product_for_export_woocommerce_instance.xml',
+        "wizard/woocommerce_export_product_category.xml",
         'data/product_data.xml',
         'data/cron.xml',
         'views/order_data_queue.xml',
