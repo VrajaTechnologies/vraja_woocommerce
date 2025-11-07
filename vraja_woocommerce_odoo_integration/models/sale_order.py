@@ -140,103 +140,182 @@ class SaleOrder(models.Model):
         }
         return vals
 
+    def get_sku_from_woocommerce_sources(self, order_line_data, instance_id, log_id, sale_order_id,
+                                         woocommerce_order_dictionary):
+        """
+        Find SKU from:
+        1) Order line
+        2) Listing Item (variant first, fallback to product)
+        3) Import product if needed
+        """
+
+        wc_product_id = order_line_data.get("product_id")
+        wc_variant_id = order_line_data.get("variation_id")
+        product_sku = order_line_data.get("sku")
+
+        ProductListingItem = self.env['woocommerce.product.listing.item']
+        ProductListing = self.env['woocommerce.product.listing']
+
+        # ---------------------------------------------------
+        # ✅ STEP 1: SKU already in order line
+        # ---------------------------------------------------
+        if product_sku:
+            return product_sku
+
+        # ---------------------------------------------------
+        # ✅ STEP 2: Try from listing items
+        # ---------------------------------------------------
+        listing_item = False
+
+        # Try variant_id first
+        if wc_variant_id and wc_variant_id != 0:
+            listing_item = ProductListingItem.search([
+                ('woocommerce_product_variant_id', '=', wc_variant_id)
+            ], limit=1)
+
+        # Fallback: try product_id
+        if not listing_item:
+            listing_item = ProductListingItem.search([
+                ('woocommerce_product_listing_id.woocommerce_product_id', '=', wc_product_id)
+            ], limit=1)
+
+        # Found SKU
+        if listing_item and listing_item.product_sku:
+            return listing_item.product_sku
+
+        # ---------------------------------------------------
+        # ✅ STEP 3: Import product because SKU still missing
+        # ---------------------------------------------------
+        sale_order_id.message_post(
+            body=f"SKU missing for '{order_line_data.get('name')}'. Attempting product import...")
+
+        product_listing = ProductListing.woocommerce_create_products(
+            product_queue_line=False,
+            instance=instance_id,
+            log_id=log_id,
+            order_line_product_listing_id=wc_product_id
+        )
+
+        # If import failed → return False
+        if not product_listing:
+            return False
+
+        # ---------------------------------------------------
+        # ✅ STEP 4: Retry finding SKU after product import
+        # ---------------------------------------------------
+
+        # Try variant
+        if wc_variant_id and wc_variant_id != 0:
+            listing_item = ProductListingItem.search([
+                ('woocommerce_product_variant_id', '=', wc_variant_id)
+            ], limit=1)
+
+        # Try product
+        if not listing_item:
+            listing_item = ProductListingItem.search([
+                ('woocommerce_product_listing_id.woocommerce_product_id', '=', wc_product_id)
+            ], limit=1)
+
+        return listing_item.product_sku if listing_item and listing_item.product_sku else False
+
     def create_woocommerce_sale_order_line(self, sale_order_id, woocommerce_order_dictionary, woocommerce_taxes,
-                                           instance_id,
-                                           log_id=False, order_queue_line=False):
+                                           instance_id, log_id=False, order_queue_line=False):
+
         woocommerce_order_lines = woocommerce_order_dictionary.get("line_items")
         if isinstance(woocommerce_order_lines, dict):
             woocommerce_order_lines = [woocommerce_order_lines]
+
         message = ''
         skip_auto_workflow = False
+        Product = self.env['product.product']
+
         for order_line_data in woocommerce_order_lines:
-            product_sku = order_line_data.get("sku")
+
+            # ✅ Get SKU using helper method
+            product_sku = self.get_sku_from_woocommerce_sources(
+                order_line_data, instance_id, log_id, sale_order_id, woocommerce_order_dictionary
+            )
+
+            # ✅ If still no SKU → skip
             if not product_sku:
-                message = "Skipping the order line of order {1} because this order line product {0} has a no product SKU".format(
-                    order_line_data.get('name'),woocommerce_order_dictionary.get('110'))
-                self.env['woocommerce.log.line'].generate_woocommerce_process_line('order', 'import', instance_id,
-                                                                                   message, False,
-                                                                                   woocommerce_order_dictionary,
-                                                                                   log_id, True)
-                sale_order_id.message_post(body=message)
+                msg = (
+                    "Skipping order line for '{0}' in order {1} because SKU could not be found."
+                ).format(order_line_data.get('name'), woocommerce_order_dictionary.get('id'))
+
+                self.env['woocommerce.log.line'].generate_woocommerce_process_line(
+                    'order', 'import', instance_id, msg, False,
+                    woocommerce_order_dictionary, log_id, True
+                )
+                sale_order_id.message_post(body=msg)
                 skip_auto_workflow = True
                 continue
-            product_id = self.env['product.product'].search([("default_code", "=", product_sku)],
-                                                            limit=1)  # need to replace find product related code
-            # need to add create product in odoo code
+
+            # ✅ Find product in Odoo
+            product_id = Product.search([("default_code", "=", product_sku)], limit=1)
+
+            # ✅ Re-import product if not found after SKU obtained
             if not product_id:
-                product_listing_id = self.env['woocommerce.product.listing'].woocommerce_create_products(
+                self.env['woocommerce.product.listing'].woocommerce_create_products(
                     product_queue_line=False, instance=instance_id, log_id=log_id,
-                    order_line_product_listing_id=order_line_data.get('product_id'))
-                if product_listing_id:
-                    product_id = self.env['product.product'].search([("default_code", "=", product_sku)],
-                                                            limit=1)
+                    order_line_product_listing_id=order_line_data.get('product_id')
+                )
+                product_id = Product.search([("default_code", "=", product_sku)], limit=1)
+
+            # ✅ Final check
             if not product_id:
-                message = "Product {0} - {1} not found for Order {2}".format(
-                    order_line_data.get("sku"), order_line_data.get("name"), woocommerce_order_dictionary.get('number'))
-                self.env['woocommerce.log.line'].generate_woocommerce_process_line('order', 'import', instance_id,
-                                                                                   message, False,
-                                                                                   woocommerce_order_dictionary,
-                                                                                   log_id, True)
-                sale_order_id.message_post(body=message)
+                msg = "Product {0} - {1} not found for Order {2}".format(
+                    product_sku, order_line_data.get("name"), woocommerce_order_dictionary.get('number')
+                )
+                self.env['woocommerce.log.line'].generate_woocommerce_process_line(
+                    'order', 'import', instance_id, msg, False,
+                    woocommerce_order_dictionary, log_id, True
+                )
+                sale_order_id.message_post(body=msg)
                 skip_auto_workflow = True
                 continue
-                # return False, message, True, 'failed'
 
-            order_line_vals = self.prepare_vals_for_sale_order_line(order_line_data.get('total'),
-                                                                    order_line_data.get('quantity'), product_id,
-                                                                    sale_order_id)
+            # ✅ Prepare SO line
+            order_line_vals = self.prepare_vals_for_sale_order_line(
+                order_line_data.get('total'),
+                order_line_data.get('quantity'),
+                product_id,
+                sale_order_id
+            )
 
-            # order_line_vals.update({'price'})
+            # ✅ Taxes
             if order_line_data.get('taxes'):
                 line_taxes = []
                 for taxes in order_line_data.get('taxes'):
-                    odoo_tax_id = self.env['account.tax'].search([
+                    tax = self.env['account.tax'].search([
                         ('woocommerce_tax_id.woocommerce_tax_id', '=', taxes.get('id'))
                     ], limit=1)
-
-                    if odoo_tax_id:
-                        line_taxes.append(odoo_tax_id.id)
+                    if tax:
+                        line_taxes.append(tax.id)
                     else:
                         skip_auto_workflow = True
                         order_queue_line.state = 'failed'
-                        error_msg = (
-                            "Woocommerce Tax ID {0} not found in account tax. "
-                            "Please configure it and then add it in order line."
-                        ).format(taxes.get('id'))
-
-                        self.env['woocommerce.log.line'].with_context(
-                            for_variant_line=order_queue_line
-                        ).generate_woocommerce_process_line(
-                            'order', 'import', instance_id, error_msg, False, error_msg, log_id, True
+                        err = f"WooCommerce Tax ID {taxes.get('id')} not found in Odoo."
+                        self.env['woocommerce.log.line'].generate_woocommerce_process_line(
+                            'order', 'import', instance_id, err, False, err, log_id, True
                         )
 
                 if line_taxes:
-                    order_line_vals.update({"tax_id": [(6, 0, line_taxes)]})
-            # order_line_vals.update({'shopify_order_line_id': order_line_data.get('id')})
+                    order_line_vals["tax_id"] = [(6, 0, line_taxes)]
+
             sale_order_line = self.env['sale.order.line'].create(order_line_vals)
-            description_parts = []
 
-            # 1️⃣ Add product name / existing description
+            # ✅ Set description
+            desc = []
             if sale_order_line.name:
-                description_parts.append(sale_order_line.name)
-            elif product_id.name:
-                description_parts.append(product_id.name)
-
-            # 2️⃣ Add WooCommerce line description (if available)
+                desc.append(sale_order_line.name)
             if order_line_data.get('name'):
-                description_parts.append(order_line_data.get('name'))
+                desc.append(order_line_data.get('name'))
 
-            # 3️⃣ Add discount info if available
             discount_total = float(order_line_data.get('subtotal')) - float(order_line_data.get('total'))
             if discount_total > 0:
-                description_parts.append(
-                    "Discount applied: -{0:.2f}".format(discount_total)
-                )
-                # # Optionally update discount field
-                # sale_order_line.discount = (discount_total / float(order_line_data.get('subtotal') or 1.0)) * 100
+                desc.append(f"Discount applied: -{discount_total:.2f}")
 
-            # 4️⃣ Update the line's name field
-            sale_order_line.name = "\n".join(description_parts)
+            sale_order_line.name = "\n".join([d for d in desc if d])
             sale_order_line.with_context(round=False)._compute_amount()
 
         return True, message, False, 'draft', skip_auto_workflow
@@ -375,17 +454,87 @@ class SaleOrder(models.Model):
         try:
             for picking_id in sale_order_id.picking_ids:
                 for move_id in picking_id.move_ids_without_package:
-                    if move_id.state in ['assigned']:
-                        move_id.sudo().write({
-                            'quantity_done': move_id.forecast_availability,
-                        })
+                    # if move_id.state in ['assigned']:
+                    #     move_id.sudo().write({
+                    #         'quantity_done': move_id.forecast_availability,
+                    #     })
+                    for line in move_id.move_line_ids:
+                        line.qty_done = move_id.product_uom_qty
                 # using below code we will validate delivery order automatically
                 picking_id.with_context(skip_sms=True).button_validate()
-                return True, False, False, 'draft'
+                return True, 'Delivery Order Validated Successfully', False, 'completed'
         except Exception as e:
             error_msg = 'Can not validate delivery order of sale order - {0} \n Error: {1}'.format(
                 sale_order_id.name, e)
             return False, error_msg, True, 'partially_completed'
+
+    def auto_create_woocommerce_invoice(self, sale_order_id, sale_auto_workflow_id):
+        """
+        Auto-create and validate the invoice for a WooCommerce Sale Order
+        based on auto workflow configuration.
+        Also auto-create payment entry if the order is already paid in WooCommerce.
+        """
+
+        try:
+            # ✅ Step 1: Check if invoice creation is required
+            if sale_order_id.invoice_status != "to invoice":
+                return False, f"No items to invoice for {sale_order_id.name}", False, 'skipped'
+
+            # ✅ Step 2: Ensure workflow journal exists
+            journal = sale_auto_workflow_id.journal_id
+            if not journal:
+                return False, f"No journal configured in workflow for {sale_order_id.name}", True, 'failed'
+
+            # ✅ Step 3: Create Invoice (draft)
+            ctx = {"default_journal_id": journal.id}
+            invoices = sale_order_id.with_context(ctx)._create_invoices()
+
+            if not invoices:
+                return False, f"Invoice not created for {sale_order_id.name}", True, 'failed'
+
+            invoice = invoices[0]
+
+            # ✅ Step 4: Validate (post) invoice
+            invoice.action_post()
+
+            # -------------------------------------------------------------------------
+            # ✅ ✅ OPTIONAL STEP — Create Payment IF WooCommerce Order is Paid
+            # -------------------------------------------------------------------------
+            # You can store this boolean on the sale order when importing:
+            # sale_order_id.woocommerce_is_paid = True/False
+            # or lookup using wc order payload like:
+            # if wc_status in ('processing','completed'): paid=True
+            # -------------------------------------------------------------------------
+            if sale_order_id.woocommerce_is_paid:  # <-- Your field flag
+                payment_method_line = journal.inbound_payment_method_line_ids.filtered(
+                    lambda x: x.name.lower() == 'manual payment'
+                )
+
+                if not payment_method_line:
+                    return False, (
+                            "Payment method line not found in journal '%s' → Cannot create payment for order %s"
+                            % (journal.name, sale_order_id.name)
+                    ), True, 'partially_completed'
+
+                # ✅ Create Payment in Odoo
+                payment_vals = {
+                    'payment_type': 'inbound',
+                    'partner_id': sale_order_id.partner_id.id,
+                    'amount': invoice.amount_total,
+                    'journal_id': journal.id,
+                    'payment_method_line_id': payment_method_line.id,
+                    'date': fields.Date.today(),
+                    'ref': sale_order_id.woocommerce_order_id or sale_order_id.name,
+                }
+                payment = self.env['account.payment'].create(payment_vals)
+                payment.action_post()
+
+            # ✅ Completed Successfully
+            return True, "Invoice created & validated successfully", False, 'completed'
+
+        except Exception as e:
+            error_msg = f"Cannot create invoice for Sale Order {sale_order_id.name}\nError: {e}"
+            return False, error_msg, True, 'failed'
 
     def check_automatic_workflow_process_for_woocommerce_order(self, instance_id, woocommerce_order_dictionary,
                                                                sale_order_id, financial_status, skip_auto_workflow):
@@ -408,7 +557,14 @@ class SaleOrder(models.Model):
                 sale_auto_workflow_id and sale_auto_workflow_id.confirm_sale_order and sale_auto_workflow_id.validate_delivery_order and
                 sale_order_id.state == 'sale'):
             result, log_msg, fault_or_not, line_state = self.auto_validate_woocommerce_delivery_order(sale_order_id)
-
+            if not result:
+                return result,log_msg,fault_or_not,line_state
+        if (
+                sale_auto_workflow_id
+                and sale_auto_workflow_id.create_invoice
+                and sale_order_id.state == 'sale'
+        ):
+            result, log_msg, fault_or_not, line_state = self.auto_create_woocommerce_invoice(sale_order_id)
         #  If no workflow actions were triggered, still mark process as successful (not failed)
         if not sale_auto_workflow_id or (
                 not sale_auto_workflow_id.confirm_sale_order

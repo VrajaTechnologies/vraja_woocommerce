@@ -991,16 +991,68 @@ class WooCommerceProductListing(models.Model):
         """
         # Step 1: Get Product Data
         product_data = self.get_woocommerce_product_data(instance, product_queue_line, order_line_product_listing_id)
-        if not product_data or not product_data.get('sku'):
+        if not product_data:
             product_queue_line.state = 'failed'
             product_queue_line.number_of_fails += 1
-            error_msg = "Product SKU not found in WooCommerce product data"
+            error_msg = "WooCommerce product data not found"
             self.env['woocommerce.log.line'].with_context(
-                for_variant_line=product_queue_line).generate_woocommerce_process_line('product', 'import', instance,
-                                                                                       error_msg, False, error_msg,
-                                                                                       log_id, True)
+                for_variant_line=product_queue_line
+            ).generate_woocommerce_process_line(
+                'product', 'import', instance, error_msg, False, error_msg, log_id, True
+            )
             return False
 
+        product_type = product_data.get('type')
+        parent_sku = product_data.get('sku')
+
+        # ✅ RULES IMPLEMENTED:
+        # ✅ Simple product → MUST have SKU
+        # ✅ Variable product → Parent SKU optional; variants will be checked later
+        if product_type == "simple" and not parent_sku:
+            product_queue_line.state = 'failed'
+            product_queue_line.number_of_fails += 1
+            error_msg = "Simple product skipped because SKU is missing"
+            self.env['woocommerce.log.line'].with_context(
+                for_variant_line=product_queue_line
+            ).generate_woocommerce_process_line(
+                'product', 'import', instance, error_msg, False, error_msg, log_id, True
+            )
+            return False
+
+        # ✅ For variable product: allow no parent SKU
+        # ✅ But ensure at least ONE variant has SKU later (handled in listing items)
+        if product_type == "variable":
+            # Check if ANY variant has SKU
+            variant_api_url = f"{instance.woocommerce_url}/wp-json/wc/v3/products/{product_data.get('id')}/variations"
+            response_status, variant_list, next_page_link = instance.woocommerce_api_calling_process(
+                "GET", variant_api_url, False, "per_page=100"
+            )
+
+            # If API fails, fallback to skip
+            if not response_status or not isinstance(variant_list, list):
+                product_queue_line.state = 'failed'
+                product_queue_line.number_of_fails += 1
+                error_msg = "Unable to fetch variant details for variable product."
+                self.env['woocommerce.log.line'].with_context(
+                    for_variant_line=product_queue_line
+                ).generate_woocommerce_process_line(
+                    'product', 'import', instance, error_msg, False, error_msg, log_id, True
+                )
+                return False
+
+            # ✅ Now correctly check variant SKUs
+            any_variant_has_sku = any(v.get("sku") for v in variant_list if isinstance(v, dict))
+
+            if not any_variant_has_sku:
+                product_queue_line.state = 'failed'
+                product_queue_line.number_of_fails += 1
+                error_msg = "Skipping variable product because none of its variants have SKU."
+                self.env['woocommerce.log.line'].with_context(
+                    for_variant_line=product_queue_line
+                ).generate_woocommerce_process_line(
+                    'product', 'import', instance, error_msg, False, error_msg, log_id, True
+                )
+                return False
             # Step 2: Find/Create Product Listing and listing item
         product_category = self.get_odoo_product_category(
             product_data.get('categories')[0].get('name') if product_data.get('categories') else "Uncategorized"

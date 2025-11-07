@@ -92,6 +92,7 @@ class WooCommerceOperations(models.TransientModel):
             product_queue_ids = self.env['woocommerce.product.data.queue'].import_product_from_woocommerce_to_odoo(instance,
                                                                                                        self.from_date_product,
                                                                                                        self.to_date_product,
+
                                                                                                        self.woocommerce_product_ids)
             if product_queue_ids:
                 queue_ids = product_queue_ids
