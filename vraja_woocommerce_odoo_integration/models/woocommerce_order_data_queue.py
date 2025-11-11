@@ -80,8 +80,8 @@ class WooCommerceOrderDataQueue(models.Model):
             params = (
                 {'include': woocommerce_order_ids} if woocommerce_order_ids else
                 {
-                    'after': from_date,
-                    'before': to_date,
+                    'after':  datetime.today() - timedelta(days=1) if cancelled else from_date,
+                    'before': datetime.today() if cancelled else to_date,
                     'per_page': 100,
                     'status': 'cancelled' if cancelled else 'completed'
                 })
@@ -101,7 +101,7 @@ class WooCommerceOrderDataQueue(models.Model):
         return woocommerce_order_list
 
     def import_order_from_woocommerce_to_odoo(self, instance, from_date=False, to_date=False,woocommerce_order_ids=False):
-        """To import order from woocommerce"""
+        """import order from woocommerce"""
         from_date = from_date if from_date else fields.Datetime.now() - timedelta(10)
         to_date = to_date if to_date else fields.Datetime.now()
         cancelled = self.env.context.get('cancelled', False)
