@@ -64,7 +64,6 @@ class WooCommerceInstanceIntegrations(models.Model):
 
     webhook_ids = fields.One2many("woocommerce.webhook", "instance_id", "Webhooks")
 
-
     # @api.model
     # def create(self, vals):
     #     record = super(WooCommerceInstanceIntegrations, self).create(vals)
@@ -94,6 +93,8 @@ class WooCommerceInstanceIntegrations(models.Model):
         self.env['woocommerce.product.category'].import_product_category(self)
         self.env['woocommerce.product.tags'].import_product_tags(self)
         self.setup_woocommerce_export_stock_cron()
+        self.setup_woocommerce_import_cancelled_order_cron()
+        self.setup_woocommerce_import_order_cron()
         message = _("Connection Test Succeeded!")
         return {
             'effect': {
@@ -134,18 +135,49 @@ class WooCommerceInstanceIntegrations(models.Model):
         cron_name = "Woocommerce: [{0}] Prepare export stock data for Woocommerce".format(self.name)
         model_name = 'woocommerce.instance.integration'
         # code_method = 'model.prepare_export_stock_data_for_shopify({0})'.format(self.id)
-        self.create_cron_for_automation_task(cron_name, model_name, code_method,
-                                             interval_type='minutes', interval_number=40,
-                                             numbercall=1, nextcall_timegap_minutes=20)
+        self.create_cron_for_automation_task(cron_name, model_name, code_method, interval_type='minutes',
+                                             interval_number=40, numbercall=1, nextcall_timegap_minutes=20)
+        return True
+
+    def setup_woocommerce_import_cancelled_order_cron(self):
+        """Create or ensure a cron job exists to import cancelled WooCommerce orders daily."""
+        code_method = f"model.cron_import_cancelled_order({self.id})"
+        existing_cron = self.env['ir.cron'].search([('code', '=', code_method), ('active', 'in', [True, False]),
+                                                    ('woocommerce_instance', '=', self.id)])
+        if existing_cron:
+            _logger.info(f"import cancelled order Cron already exists for instance: {self.name}")
+            return True
+        cron_name = f"Woocommerce: [{self.name}] Import Cancelled Orders"
+        model_name = 'woocommerce.order.data.queue'
+        self.create_cron_for_automation_task(cron_name=cron_name, model_name=model_name,
+                                             code_method=code_method, interval_type='days',
+                                             interval_number=1, numbercall=-1, nextcall_timegap_minutes=1)
+        _logger.info("Created cancelled order cron for instance: %s", self.name)
+        return True
+
+    def setup_woocommerce_import_order_cron(self):
+        """Create or ensure a cron job exists to import WooCommerce orders every 3 hours."""
+        code_method = f"model.cron_import_order({self.id})"
+        existing_cron = self.env['ir.cron'].search([('code', '=', code_method), ('active', 'in', [True, False]),
+                                                    ('woocommerce_instance', '=', self.id)])
+        if existing_cron:
+            _logger.info(f"import order Cron already exists for instance: {self.name}")
+            return True
+        cron_name = f"Woocommerce: [{self.name}] Import Orders"
+        model_name = 'woocommerce.order.data.queue'
+        self.create_cron_for_automation_task(cron_name=cron_name, model_name=model_name,
+                                             code_method=code_method, interval_type='hours',
+                                             interval_number=3, numbercall=-1, nextcall_timegap_minutes=1)
+        _logger.info("Created import order cron for instance: %s", self.name)
         return True
 
     def woocommerce_api_calling_process(self, request_type=False, api_url=False, request_data=False, params=False):
         data = "%s:%s" % (self.woocommerce_key,
                           self.woocommerce_secret)
         encode_data = base64.b64encode(data.encode("utf-8"))
-        authrization_data = "Basic %s" % (encode_data.decode("utf-8"))
+        authorization_data = "Basic %s" % (encode_data.decode("utf-8"))
         headers = {
-            'Authorization': authrization_data,
+            'Authorization': authorization_data,
             "Content-Type": "application/json"
         }
         _logger.info("Shipment Request API URL:::: %s" % api_url)
@@ -171,8 +203,6 @@ class WooCommerceInstanceIntegrations(models.Model):
         self.env.cr.execute(query, (date,))
         result = self.env.cr.fetchall()
         return [item[0] for item in result]
-
-
 
     def prepare_export_stock_data_for_woocommerce(self, instance):
         """
@@ -211,7 +241,6 @@ class WooCommerceInstanceIntegrations(models.Model):
         for item in listing_items:
             product = item.product_id
             actual_stock = getattr(product, 'free_qty', 0)
-
 
             queue_line_data.append({
                 'product_id': product.id,
@@ -288,4 +317,3 @@ class WooCommerceInstanceIntegrations(models.Model):
 
         _logger.info("WooCommerce stock queue created successfully for %d products.", len(queue_line_data))
         return True
-

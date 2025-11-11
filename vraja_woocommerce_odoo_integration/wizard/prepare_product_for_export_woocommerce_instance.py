@@ -271,8 +271,7 @@ class PrepareProductForExportWoocommerceInstance(models.TransientModel):
                 action = "update"
 
             try:
-                status, data, _ = instance.woocommerce_api_calling_process(method, api_url, json.dumps(payload),
-                                                                           "per_page=100")
+                status, data, _ = instance.woocommerce_api_calling_process(method, api_url, json.dumps(payload),"per_page=100")
                 if isinstance(data, str):
                     try:
                         data = json.loads(data or "{}")

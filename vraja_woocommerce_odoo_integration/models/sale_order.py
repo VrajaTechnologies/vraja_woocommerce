@@ -578,7 +578,7 @@ class SaleOrder(models.Model):
         return result, log_msg, fault_or_not, line_state
 
     def process_import_order_from_woocommerce(self, woocommerce_order_dictionary, instance_id, log_id=False,
-                                              line=False):
+                                              line=False, cancelled = False):
 
         """This method was used for import the order from woocommerce to odoo and process that order
             @param : woocommerce_order_dictionary : json response of specific order queue line
@@ -589,13 +589,26 @@ class SaleOrder(models.Model):
         """
         # line.processed_at = fields.Datetime.now()
         woocommerce_taxes = {}
+        order_number = str(woocommerce_order_dictionary.get("number") or "")
         existing_order = self.search([("instance_id", "=", instance_id.id),
-                                      ("woocommerce_order_number", "=", woocommerce_order_dictionary.get("number"))],
-                                     limit=1)
+                                      ("woocommerce_order_number", "=", order_number)], limit=1)
         if existing_order:
             line.sale_order_id = existing_order.id
-            msg = "Order Number {0} - {1}".format(existing_order.name, "Is Already Exist In Odoo")
-            return True, msg, False, 'completed'
+            if cancelled:
+                if existing_order.state not in ['cancel', 'done']:
+                    existing_order.action_cancel()
+                    msg = "Order Number {0} - Cancelled in Odoo (from WooCommerce)".format(existing_order.name)
+                    return True, msg, False, 'completed'
+                else:
+                    msg = "Order Number {0} - Already Cancelled in Odoo".format(existing_order.name)
+                    return True, msg, False, 'completed'
+            else:
+                msg = "Order Number {0} - Already Exists in Odoo.".format(existing_order.name)
+                return True, msg, False, 'completed'
+        if cancelled:
+            msg = f"Order {woocommerce_order_dictionary.get('number')} not found in Odoo — cannot cancel."
+            return False, msg, True, 'failed'
+
         success, financial_status, message, is_error, state = self.create_or_update_payment_gateway_and_workflow(
             woocommerce_order_dictionary, instance_id,
             line)
@@ -615,8 +628,7 @@ class SaleOrder(models.Model):
             if isinstance(woocommerce_taxes, bool):
                 return False
 
-        currency_id = self.env['res.currency'].search([('name', '=', woocommerce_order_dictionary.get('currency'))],
-                                                      limit=1)
+        currency_id = self.env['res.currency'].search([('name', '=', woocommerce_order_dictionary.get('currency'))], limit=1)
         price_list_id = self.get_price_list(currency_id, instance_id)
         date_order = self.convert_woocommerce_order_date(woocommerce_order_dictionary)
         sale_order_id = self.create({"partner_id": customer_id and customer_id.id,

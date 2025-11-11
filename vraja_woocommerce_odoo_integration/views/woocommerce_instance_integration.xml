@@ -24,7 +24,7 @@
             </field>
         </record>
         <record id="action_instance_woocommerce_product_listing" model="ir.actions.act_window">
-            <field name="name">Woocommerce Listing</field>
+            <field name="name">Woocommerce Product</field>
             <field name="res_model">woocommerce.product.listing</field>
             <field name="domain">[('woocommerce_instance_id', '=', active_id)]</field>
             <field name='view_mode'>tree,form</field>

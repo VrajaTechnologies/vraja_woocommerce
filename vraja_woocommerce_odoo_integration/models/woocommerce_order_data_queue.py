@@ -76,67 +76,73 @@ class WooCommerceOrderDataQueue(models.Model):
         from_date = pytz.utc.localize(from_date).astimezone(pytz.timezone(instance.woocommerce_store_timezone))
         to_date = pytz.utc.localize(to_date).astimezone(pytz.timezone(instance.woocommerce_store_timezone))
         try:
-            params = {'include': woocommerce_order_ids} if woocommerce_order_ids else {"after": from_date,
-                                                                                       "before": to_date,
-                                                                                       'status': 'completed',
-                                                                                       }
-            params["per_page"] = 100
+            cancelled = self.env.context.get('cancelled')
+            params = (
+                {'include': woocommerce_order_ids} if woocommerce_order_ids else
+                {
+                    'after': from_date,
+                    'before': to_date,
+                    'per_page': 100,
+                    'status': 'cancelled' if cancelled else 'completed'
+                })
             url = "{0}/wp-json/wc/v3/orders".format(instance.woocommerce_url)
             response_status, response_data, next_page_link = instance.woocommerce_api_calling_process("GET", url, params=params)
             if not response_status:
-                _logger.info("Getting Some error while fetch customer from Woocommerce : {0}".format(response_data))
+                _logger.info("Getting Some error while fetch order from Woocommerce : {0}".format(response_data))
                 return False
             woocommerce_order_list = response_data
             while next_page_link:
-                response_status, response_data, next_page_link = instance.woocommerce_api_calling_process("GET", next_page_link, params=params)
-                # woocommerce_order_list = woocommerce_order_list.append(response_data)
+                response_status, response_data, next_page_link = instance.woocommerce_api_calling_process("GET",next_page_link,
+                                                                                                          params=params)
+                woocommerce_order_list += response_data
             _logger.info(woocommerce_order_list)
         except Exception as error:
-            _logger.info("Getting Some Error In Fetch The customer :: {0}".format(error))
+            _logger.info("Getting Some Error In Fetch The orders :: {0}".format(error))
         return woocommerce_order_list
 
-    def import_order_from_woocommerce_to_odoo(self, instance, from_date=False, to_date=False,
-                                              woocommerce_order_ids=False):
+    def import_order_from_woocommerce_to_odoo(self, instance, from_date=False, to_date=False,woocommerce_order_ids=False):
+        """To import order from woocommerce"""
         from_date = from_date if from_date else fields.Datetime.now() - timedelta(10)
         to_date = to_date if to_date else fields.Datetime.now()
-
-        woocommerce_order_list = self.fetch_orders_from_woocommerce_to_odoo(instance, from_date, to_date,
-                                                                            woocommerce_order_ids)
+        cancelled = self.env.context.get('cancelled', False)
+        woocommerce_order_list = self.fetch_orders_from_woocommerce_to_odoo(instance, from_date, to_date,woocommerce_order_ids)
+        if cancelled and not woocommerce_order_list:
+            _logger.info("No CANCELLED orders found to import for instance: %s", instance.name)
+            return True
         if woocommerce_order_list:
             res_id_list = self.create_woocommerce_order_queue_job(instance, woocommerce_order_list)
-            instance.woocommerce_last_synced_order_date = to_date
+            if cancelled:
+                for queue in self.env['woocommerce.order.data.queue'].browse(res_id_list):
+                    queue.name = f"{queue.name} - Cancelled Orders"
+        if not woocommerce_order_list:
+            _logger.info("There is no order to import for instance: %s", instance.name)
             return res_id_list
 
     def process_woocommerce_order_queue(self, instance_id=False):
         """This method was used for process the order queue line from order queue"""
-
         sale_order_object, instance_id = self.env['sale.order'], instance_id if instance_id else self.instance_id
-
         order_data_queues = self
+        cancelled =  'cancelled orders' in (self.name or '').lower()
         for order_data_queue in order_data_queues:
             if order_data_queue.woocommerce_log_id:
                 log_id = order_data_queue.woocommerce_log_id
             else:
-                log_id = self.env['woocommerce.log'].generate_woocommerce_logs('order', 'import', instance_id,
-                                                                               'Process Started')
+                log_id = self.env['woocommerce.log'].generate_woocommerce_logs('order', 'import', instance_id,'Process Started')
             self._cr.commit()
             order_data_queue_lines = order_data_queue.woocommerce_order_queue_line_ids.filtered(
                 lambda x: x.state in ['draft', 'partially_completed', 'failed'])
             for line in order_data_queue_lines:
                 try:
                     woocommerce_order_dictionary = safe_eval(line.order_data_to_process)
-                    result, msg,fault_or_not,line_state = sale_order_object.process_import_order_from_woocommerce(
+                    result, msg, fault_or_not, line_state = sale_order_object.process_import_order_from_woocommerce(
                         woocommerce_order_dictionary,
-                        instance_id, log_id, line)
+                        instance_id, log_id, line, cancelled = cancelled)
                     if result:
                         line.state = line_state
                         self.env['woocommerce.log.line'].generate_woocommerce_process_line('order', 'import',
-                                                                                           instance_id,
-                                                                                           msg,
-                                                                                           False,
+                                                                                           instance_id,msg,False,
                                                                                            woocommerce_order_dictionary,
-                                                                                           log_id,
-                                                                                           fault_or_not)
+                                                                                           log_id,fault_or_not)
                     else:
                         line.state = line_state
                         self.env['woocommerce.log.line'].generate_woocommerce_process_line('order', 'import',
@@ -150,6 +156,17 @@ class WooCommerceOrderDataQueue(models.Model):
             if not log_id.woocommerce_operation_line_ids:
                 log_id.unlink()
 
+    def cron_import_cancelled_order(self, instance_id):
+        """cron to import cancelled order from woocommerce"""
+        instance = self.env['woocommerce.instance.integration'].browse(instance_id)
+        _logger.info("Importing CANCELLED WooCommerce orders: %s", instance.name)
+        return self.with_context(cancelled=True).import_order_from_woocommerce_to_odoo(instance)
+
+    def cron_import_order(self, instance_id):
+        """cron to import order from woocommerce"""
+        instance = self.env['woocommerce.instance.integration'].browse(instance_id)
+        _logger.info("Importing Woocommerce orders: %s", instance.name)
+        return self.import_order_from_woocommerce_to_odoo(instance)
 
 class WoocommerceOrderDataQueueLine(models.Model):
     _name = 'woocommerce.order.data.queue.line'
