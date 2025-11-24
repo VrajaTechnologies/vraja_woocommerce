@@ -20,6 +20,11 @@ class SaleOrder(models.Model):
     woocommerce_sale_auto_workflow_id = fields.Many2one('woocommerce.order.workflow.automation',
                                                         'WooCommerce Auto Workflow')
     payment_gateway_id = fields.Many2one('woocommerce.payment.gateway', string="Payment Method")
+    woocommerce_is_paid = fields.Boolean(
+        string="WooCommerce Paid",
+        copy=False,
+        help="Indicates if WooCommerce order was already paid."
+    )
 
     def find_create_woocommerce_customer_in_odoo(self, instance_id, woocommerce_order_dictionary, log_id=False,
                                                  line=False):
@@ -471,66 +476,113 @@ class SaleOrder(models.Model):
     def auto_create_woocommerce_invoice(self, sale_order_id, sale_auto_workflow_id):
         """
         Auto-create and validate the invoice for a WooCommerce Sale Order
-        based on auto workflow configuration.
-        Also auto-create payment entry if the order is already paid in WooCommerce.
+        based on workflow configuration.
+        Also auto-creates payment if WooCommerce shows the order is paid.
         """
 
         try:
-            # ✅ Step 1: Check if invoice creation is required
+            # ---------------------------------------------------------
+            # 1. VALIDATE: Order must be invoiceable
+            # ---------------------------------------------------------
             if sale_order_id.invoice_status != "to invoice":
                 return False, f"No items to invoice for {sale_order_id.name}", False, 'skipped'
 
-            # ✅ Step 2: Ensure workflow journal exists
-            journal = sale_auto_workflow_id.journal_id
-            if not journal:
-                return False, f"No journal configured in workflow for {sale_order_id.name}", True, 'failed'
+            # ---------------------------------------------------------
+            # 2. GET INVOICE JOURNAL
+            # ---------------------------------------------------------
+            invoice_journal = sale_auto_workflow_id.invoice_journal_id
+            if not invoice_journal:
+                return False, (
+                    f"No Invoice Journal configured in workflow for {sale_order_id.name}"
+                ), True, 'failed'
 
-            # ✅ Step 3: Create Invoice (draft)
-            ctx = {"default_journal_id": journal.id}
+            # ---------------------------------------------------------
+            # 3. CREATE INVOICE
+            # ---------------------------------------------------------
+            ctx = {"default_journal_id": invoice_journal.id}
             invoices = sale_order_id.with_context(ctx)._create_invoices()
 
             if not invoices:
                 return False, f"Invoice not created for {sale_order_id.name}", True, 'failed'
 
             invoice = invoices[0]
-
-            # ✅ Step 4: Validate (post) invoice
+            # ---------------------------------------------------------
+            # SET WOO INSTANCE ON INVOICE
+            # ---------------------------------------------------------
+            if sale_order_id.instance_id:
+                invoice.woocommerce_instance_id = sale_order_id.instance_id.id
+            # ---------------------------------------------------------
+            # 4. VALIDATE INVOICE
+            # ---------------------------------------------------------
             invoice.action_post()
 
-            # -------------------------------------------------------------------------
-            # ✅ ✅ OPTIONAL STEP — Create Payment IF WooCommerce Order is Paid
-            # -------------------------------------------------------------------------
-            # You can store this boolean on the sale order when importing:
-            # sale_order_id.woocommerce_is_paid = True/False
-            # or lookup using wc order payload like:
-            # if wc_status in ('processing','completed'): paid=True
-            # -------------------------------------------------------------------------
-            if sale_order_id.woocommerce_is_paid:  # <-- Your field flag
-                payment_method_line = journal.inbound_payment_method_line_ids.filtered(
-                    lambda x: x.name.lower() == 'manual payment'
-                )
+            # ---------------------------------------------------------
+            # 5. HANDLE PAYMENT (ONLY IF ORDER IS PAID IN WOOCOMMERCE)
+            # ---------------------------------------------------------
+            if sale_order_id.woocommerce_is_paid:
+
+                # -----------------------------------------------------
+                # 5.1 Get Payment Journal
+                # -----------------------------------------------------
+                payment_journal = sale_auto_workflow_id.payment_journal_id
+
+                if not payment_journal:
+                    return False, (
+                        "Payment Journal not configured → Cannot register payment "
+                        f"for order {sale_order_id.name}"
+                    ), True, 'partially_completed'
+
+                if payment_journal.type not in ("bank", "cash"):
+                    return False, (
+                        f"Invalid Payment Journal '{payment_journal.name}'. "
+                        "Only Bank/Cash journal can be used for payments."
+                    ), True, 'failed'
+
+                # -----------------------------------------------------
+                # 5.2 Fetch Payment Method Line
+                # -----------------------------------------------------
+                payment_method_line = payment_journal.inbound_payment_method_line_ids[:1]
 
                 if not payment_method_line:
                     return False, (
-                            "Payment method line not found in journal '%s' → Cannot create payment for order %s"
-                            % (journal.name, sale_order_id.name)
-                    ), True, 'partially_completed'
+                        f"No inbound payment method found in journal '{payment_journal.name}'."
+                    ), True, 'failed'
 
-                # ✅ Create Payment in Odoo
+                # -----------------------------------------------------
+                # 5.3 Avoid Duplicate Payments
+                # -----------------------------------------------------
+                existing_payment = self.env['account.payment'].search([
+                    ('ref', '=', sale_order_id.woocommerce_order_id or sale_order_id.name),
+                    ('partner_id', '=', sale_order_id.partner_id.id),
+                    ('amount', '=', invoice.amount_total),
+                    ('state', '!=', 'cancel')
+                ], limit=1)
+
+                if existing_payment:
+                    return True, (
+                        f"Invoice created. Payment already exists → {existing_payment.name}"
+                    ), False, 'completed'
+
+                # -----------------------------------------------------
+                # 5.4 CREATE PAYMENT
+                # -----------------------------------------------------
                 payment_vals = {
                     'payment_type': 'inbound',
                     'partner_id': sale_order_id.partner_id.id,
                     'amount': invoice.amount_total,
-                    'journal_id': journal.id,
+                    'journal_id': payment_journal.id,
                     'payment_method_line_id': payment_method_line.id,
                     'date': fields.Date.today(),
                     'ref': sale_order_id.woocommerce_order_id or sale_order_id.name,
                 }
+
                 payment = self.env['account.payment'].create(payment_vals)
                 payment.action_post()
 
-            # ✅ Completed Successfully
-            return True, "Invoice created & validated successfully", False, 'completed'
+            # ---------------------------------------------------------
+            # 6. SUCCESS
+            # ---------------------------------------------------------
+            return True, "Invoice created & payment registered successfully", False, 'completed'
 
         except Exception as e:
             error_msg = f"Cannot create invoice for Sale Order {sale_order_id.name}\nError: {e}"
@@ -551,20 +603,24 @@ class SaleOrder(models.Model):
         # This code confirms a sale order if the "confirm sale order" field is true in the sales auto workflow.
         if sale_auto_workflow_id and sale_auto_workflow_id.confirm_sale_order:
             result, log_msg, fault_or_not, line_state = self.auto_confirm_woocommerce_sale_order(sale_order_id)
-
+            if not result:
+                return result, log_msg, fault_or_not, line_state
         # This code confirms a delivery order if the "confirm delivery order" field is true in the sales auto workflow.
         if (
                 sale_auto_workflow_id and sale_auto_workflow_id.confirm_sale_order and sale_auto_workflow_id.validate_delivery_order and
                 sale_order_id.state == 'sale'):
             result, log_msg, fault_or_not, line_state = self.auto_validate_woocommerce_delivery_order(sale_order_id)
             if not result:
-                return result,log_msg,fault_or_not,line_state
+                return result, log_msg, fault_or_not, line_state
         if (
                 sale_auto_workflow_id
                 and sale_auto_workflow_id.create_invoice
                 and sale_order_id.state == 'sale'
         ):
-            result, log_msg, fault_or_not, line_state = self.auto_create_woocommerce_invoice(sale_order_id)
+            result, log_msg, fault_or_not, line_state = self.auto_create_woocommerce_invoice(sale_order_id,
+                                                                                             sale_auto_workflow_id)
+            if not result:
+                return result, log_msg, fault_or_not, line_state
         #  If no workflow actions were triggered, still mark process as successful (not failed)
         if not sale_auto_workflow_id or (
                 not sale_auto_workflow_id.confirm_sale_order
@@ -578,7 +634,7 @@ class SaleOrder(models.Model):
         return result, log_msg, fault_or_not, line_state
 
     def process_import_order_from_woocommerce(self, woocommerce_order_dictionary, instance_id, log_id=False,
-                                              line=False, cancelled = False):
+                                              line=False, cancelled=False):
 
         """This method was used for import the order from woocommerce to odoo and process that order
             @param : woocommerce_order_dictionary : json response of specific order queue line
@@ -605,6 +661,7 @@ class SaleOrder(models.Model):
             else:
                 msg = "Order Number {0} - Already Exists in Odoo.".format(existing_order.name)
                 return True, msg, False, 'completed'
+        # if in cancel API we found order which order is not available in odoo then we can just skip that line and set that line as a failed
         if cancelled:
             msg = f"Order {woocommerce_order_dictionary.get('number')} not found in Odoo — cannot cancel."
             return False, msg, True, 'failed'
@@ -628,7 +685,8 @@ class SaleOrder(models.Model):
             if isinstance(woocommerce_taxes, bool):
                 return False
 
-        currency_id = self.env['res.currency'].search([('name', '=', woocommerce_order_dictionary.get('currency'))], limit=1)
+        currency_id = self.env['res.currency'].search([('name', '=', woocommerce_order_dictionary.get('currency'))],
+                                                      limit=1)
         price_list_id = self.get_price_list(currency_id, instance_id)
         date_order = self.convert_woocommerce_order_date(woocommerce_order_dictionary)
         sale_order_id = self.create({"partner_id": customer_id and customer_id.id,
@@ -648,6 +706,8 @@ class SaleOrder(models.Model):
                               'woocommerce_order_number': woocommerce_order_dictionary.get('number', ''),
                               'woocommerce_sale_auto_workflow_id': financial_status.sale_auto_workflow_id.id,
                               "woocommerce_order_id": woocommerce_order_dictionary.get("id"),
+                              "woocommerce_is_paid": True if woocommerce_order_dictionary.get('status') in (
+                                  'processing', 'completed') else False,
                               })
 
         line.sale_order_id = sale_order_id.id  # this line used for set the sale order id in order queue line sale order field

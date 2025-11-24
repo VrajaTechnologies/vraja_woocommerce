@@ -35,6 +35,7 @@
         'views/account_tax.xml',
         'views/delivery_carrier.xml',
         'views/product_template.xml',
+        'views/account_move_view.xml'
     ],
 
     'images': [],

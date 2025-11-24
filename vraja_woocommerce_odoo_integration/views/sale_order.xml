@@ -15,6 +15,7 @@
                                 <field name="woocommerce_sale_auto_workflow_id" readonly="1"/>
                                 <field name="woocommerce_order_id" readonly="1"/>
                                 <field name="payment_gateway_id" readonly="1"/>
+                                <field name="woocommerce_is_paid" readonly="1"/>
                             </group>
                         </group>
                     </page>

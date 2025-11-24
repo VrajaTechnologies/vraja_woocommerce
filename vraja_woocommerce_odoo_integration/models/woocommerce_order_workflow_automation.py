@@ -9,12 +9,18 @@ class WoocommerceOrderWorkflowAutomation(models.Model):
     name = fields.Char(string='Name', help='Enter Name', copy=False, tracking=True)
     company_id = fields.Many2one('res.company', string='Company', help='Select Company',
                                  copy=False, tracking=True, default=lambda self: self.env.user.company_id)
-    journal_id = fields.Many2one('account.journal', string='Journal', help='Select Journal',
-                                 copy=False, tracking=True)
+    invoice_journal_id = fields.Many2one('account.journal', string='Invoice Journal',
+                                         help='Journal used to create Customer Invoice', copy=False, tracking=True
+                                         )
+
+    payment_journal_id = fields.Many2one('account.journal', string='Payment Journal',
+                                         help='Bank/Cash journal used to register payments', copy=False, tracking=True
+                                         )
     confirm_sale_order = fields.Boolean(string='Confirm Sale Order',
                                         help='Enable this option if you want to confirm sale order',
                                         copy=False, tracking=True)
-    create_invoice = fields.Boolean(string='Invoice', help='Enable this option if you want to Create Invoice & Validate',
+    create_invoice = fields.Boolean(string='Invoice',
+                                    help='Enable this option if you want to Create Invoice & Validate',
                                     copy=False, tracking=True)
     validate_delivery_order = fields.Boolean(string='Validate Delivery Order',
                                              help='Enable this option if you want to validate delivery order',

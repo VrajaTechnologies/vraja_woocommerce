@@ -15,14 +15,21 @@
                         <group>
                             <group>
                                 <field name="company_id"/>
-                                <field name="journal_id" domain="[('type', 'in', ('bank', 'cash'))]" attrs="{'required':[('create_invoice','!=',False)]}"/>
+                                <field name="invoice_journal_id"
+                                       domain="[('type', '=', 'sale')]"
+                                       attrs="{'required':[('create_invoice','=',True)]}"/>
+                                <field name="payment_journal_id"
+                                       domain="[('type', 'in', ('bank', 'cash'))]"
+                                       attrs="{'required':[('create_invoice','=',True)]}"/>
+
                             </group>
                         </group>
                         <group>
                             <group string="Workflow Option">
                                 <field name="confirm_sale_order" widget="boolean_toggle"/>
                                 <field name="validate_delivery_order" widget="boolean_toggle"/>
-                                <field name="create_invoice" attrs="{'invisible':[('confirm_sale_order','==',False)]}" widget="boolean_toggle" string="Create &amp; Validate Invoice"/>
+                                <field name="create_invoice" attrs="{'invisible':[('confirm_sale_order','==',False)]}"
+                                       widget="boolean_toggle" string="Create &amp; Validate Invoice"/>
                             </group>
                             <group string="Order Configuration">
                                 <field name="policy_of_picking" widget="radio"/>
@@ -47,7 +54,7 @@
                     <field name="company_id"/>
                     <field name="confirm_sale_order" widget="boolean_toggle"/>
                     <field name="validate_delivery_order" widget="boolean_toggle"/>
-                    <field name="create_invoice"  widget="boolean_toggle" string="Create &amp; Validate Invoice"/>
+                    <field name="create_invoice" widget="boolean_toggle" string="Create &amp; Validate Invoice"/>
                 </tree>
             </field>
         </record>
